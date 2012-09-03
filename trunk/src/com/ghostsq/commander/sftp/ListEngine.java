@@ -65,7 +65,7 @@ class ListEngine extends Engine implements ServerHostKeyVerifier {
                 if( !Utils.str( path ) ) path = File.separator;
                 @SuppressWarnings("unchecked")
                 Vector<SFTPv3DirectoryEntry> list = client.ls( path );  // obtain the list of entries
-                if( list != null && !list.isEmpty() ) {
+                if( list != null ) {
                     int num = list.size(), cnt = 0;
                     int mode = adapter.getSortMode();
                     boolean hide = ( mode & CommanderAdapter.MODE_HIDDEN ) == CommanderAdapter.HIDE_MODE;

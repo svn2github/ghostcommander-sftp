@@ -153,6 +153,7 @@ class CopyFromEngine extends SFTPEngineBase
                             out.close();
                         }
                         catch( Exception e ) {
+                            Log.e( TAG, "file: " + sftp_path_name, e );
                             sftp.closeFile( sftp_file );
                             out.close();
                             error( e.getMessage() );

@@ -8,6 +8,7 @@ import android.content.Context;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiManager.WifiLock;
 import android.os.Handler;
+import android.util.Log;
 
 import ch.ethz.ssh2.SFTPv3Client;
 import ch.ethz.ssh2.SFTPv3FileAttributes;
@@ -125,10 +126,10 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
                         if( create_dir )
                             sftp.mkdir( sftp_fn, 0777 );
                         counter += copyFiles( f.listFiles(), sftp_fn );
-                        if( errMsg != null ) break;
+                        if( !noErrors() ) break;
                     } else if( f.isFile() ) {
                         SFTPv3FileHandle new_sftp_file = sftp.createFile( sftp_fn, null ); // TODO: set correct attributes
-                        
+                       
                         
                         FileInputStream in = new FileInputStream( f );
                         byte buf[] = new byte[BLOCK_SIZE];
@@ -139,6 +140,7 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
                             String cur_op_s = ctx.getString( Utils.RR.uploading.r(), f.getAbsolutePath() );
                             String     sz_s = Utils.getHumanSize( f.length() );
                             int speed = 0;
+                            sendProgress( cur_op_s + sizeOfsize( done, sz_s ), so_far, 0, 0 );
                             while( true ) {
                                 long start_time = System.currentTimeMillis();
                                 n = in.read( buf );
@@ -154,6 +156,7 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
                             in.close();
                             sftp.closeFile( new_sftp_file );
                         } catch( Exception e ) {
+                            Log.e( TAG, "file: " + sftp_fn, e );
                             in.close();
                             sftp.closeFile( new_sftp_file );
                             error( ctx.getString( Utils.RR.fail_del.r(), sftp_fn ) );
