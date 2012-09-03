@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Date;
-import java.util.Vector;
 
 import android.content.Context;
 import android.net.wifi.WifiManager;
@@ -12,25 +11,18 @@ import android.net.wifi.WifiManager.WifiLock;
 import android.os.Handler;
 import android.util.Log;
 
-import ch.ethz.ssh2.SFTPv3Client;
-import ch.ethz.ssh2.SFTPv3DirectoryEntry;
 import ch.ethz.ssh2.SFTPv3FileHandle;
 
 import com.ghostsq.commander.Commander;
 import com.ghostsq.commander.adapters.CommanderAdapterBase;
-import com.ghostsq.commander.adapters.Engine;
 import com.ghostsq.commander.utils.ForwardCompat;
 import com.ghostsq.commander.utils.LsItem;
 import com.ghostsq.commander.utils.Utils;
 
-class CopyFromEngine extends Engine 
+class CopyFromEngine extends SFTPEngineBase 
 {
     private   final static int BLOCK_SIZE = 32768;
     private   Commander     commander;
-    private   SFTPAdapter   adapter;
-    private   SFTPv3Client  sftp;
-    private   Context       ctx;
-    private   LsItem[]      mList;
     private   String        src_path;
     private   File          dest_folder;
     private   boolean       move;
@@ -39,11 +31,8 @@ class CopyFromEngine extends Engine
     protected String        progressMessage = null;
 
     CopyFromEngine( Handler h, Commander c, SFTPAdapter a, LsItem[] list, File dest, boolean move_, int rec_h ) {
-        super( h );
+        super( h, a, list );
         commander = c;
-        adapter = a;
-        ctx  = adapter.ctx;
-        sftp = adapter.getClient();
         src_path = Utils.mbAddSl( adapter.getUri().getPath() );
         mList = list;
         dest_folder = dest;
@@ -95,10 +84,7 @@ class CopyFromEngine extends Engine
                 LsItem f = list[i];
                 if( f != null ) {
                     String fn = f.getName();
-                    if(  "/.".equals( fn ) ||
-                        "/..".equals( fn ) ||
-                          ".".equals( fn ) ||
-                         "..".equals( fn ) ) continue;
+                    if( skip( f ) ) continue;
                     
                     String rel_path_name = path + fn;
                     String sftp_path_name = src_path + rel_path_name; 
@@ -110,18 +96,9 @@ class CopyFromEngine extends Engine
                                 break;
                             }
                         }
-                        Vector<SFTPv3DirectoryEntry> dir_entries = sftp.ls( sftp_path_name );
-                        if( dir_entries == null ) {
-                            error( "No entries in " + path );
-                            break;
-                        }
-                        int num = dir_entries.size();        
-                        if( num == 0 ) continue;
-                        LsItem[] subItems = LsItem.createArray( num );
-                        for( int j = 0; j < num; j++ ) {
-                             subItems[j] = new LsItem( dir_entries.get(j).longEntry );
-                        }
-                        counter += copyFiles( subItems, rel_path_name + CommanderAdapterBase.SLS );
+                        LsItem[] subItems = getItems( sftp_path_name );
+                        if( subItems != null & subItems.length > 0 )
+                            counter += copyFiles( subItems, rel_path_name + CommanderAdapterBase.SLS );
                         if( !noErrors() ) break;
                         if( move )
                             sftp.rmdir( sftp_path_name );

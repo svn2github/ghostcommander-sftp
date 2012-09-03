@@ -233,12 +233,6 @@ public class SFTPAdapter extends CommanderAdapterBase {
     }
 
     @Override
-    public void reqItemsSize( SparseBooleanArray cis ) {
-        // TODO Auto-generated method stub
-        
-    }
-
-    @Override
     public boolean renameItem( int position, String newName, boolean copy ) {
         if( position <= 0 || position > items.length )
             return false;
@@ -320,19 +314,50 @@ public class SFTPAdapter extends CommanderAdapterBase {
 
     @Override
     public boolean createFile( String fileURI ) {
-        // TODO Auto-generated method stub
         return false;
     }
 
     @Override
-    public void createFolder( String string ) {
-        // TODO Auto-generated method stub
-        
+    public void createFolder( String name ) {
+        notify( Commander.OPERATION_STARTED );
+        worker = new MkDirEngine( workerHandler, this, Utils.mbAddSl( uri.getPath() ) + name );
+        worker.start();
     }
 
     @Override
+    public void reqItemsSize( SparseBooleanArray cis ) {
+        try {
+            LsItem[] list = bitsToItems( cis );
+            if( worker != null && worker.reqStop() )
+                return;
+            notify( Commander.OPERATION_STARTED );
+            worker = new CalcSizesEngine( workerHandler, this, list );
+            worker.start();
+        }
+        catch(Exception e) {
+        }
+    }
+    
+    @Override
     public boolean deleteItems( SparseBooleanArray cis ) {
-        // TODO Auto-generated method stub
+        try {
+            if( worker != null ) return false;
+            LsItem[] subItems = bitsToItems( cis );
+            if( subItems != null ) {
+                if( worker != null ) {
+                    notify( s( Utils.RR.copy_err.r() ), Commander.OPERATION_FAILED );
+                    return false;
+                }
+                notify( Commander.OPERATION_STARTED );
+                worker = new DelEngine( workerHandler, this, subItems );
+                worker.setName( TAG + ".DelEngine" );
+                worker.start();
+                return true;
+            }
+        }
+        catch( Exception e ) {
+            commander.showError( "Exception: " + e.getMessage() );
+        }
         return false;
     }
 
