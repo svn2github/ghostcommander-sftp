@@ -1,7 +1,10 @@
 package com.ghostsq.commander.sftp;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.Arrays;
 
@@ -82,6 +85,7 @@ public class SFTPAdapter extends CommanderAdapterBase {
     
     public final static int WAS_IN      =  1;
     public final static int LOGGED_IN   =  2;
+    public final static int NEUTRAL     =  0;
     public final static int NO_CONNECT  = -1;
     public final static int NO_LOGIN    = -2;
     
@@ -104,8 +108,10 @@ public class SFTPAdapter extends CommanderAdapterBase {
                 conn.connect( verifier );
             }
             if( conn.isAuthenticationComplete() ) {
-                if( client == null )
+                if( client == null ) {
                     client = new SFTPv3Client( conn );
+                    client.setCharset( "UTF-8" );
+                }
                 return WAS_IN;
             }
             
@@ -120,8 +126,10 @@ public class SFTPAdapter extends CommanderAdapterBase {
                 crd = new Credentials( ui );
             }
             if( conn.authenticateWithPassword( crd.getUserName(), crd.getPassword() ) ) {
-                if( client == null )
+                if( client == null ) {
                     client = new SFTPv3Client( conn /*, System.out*/ );
+                    client.setCharset( "UTF-8" );
+                }
                 return LOGGED_IN;
             } else {
                 disconnect();
@@ -407,4 +415,44 @@ public class SFTPAdapter extends CommanderAdapterBase {
         if( conn != null ) conn.close();
         items = null;
     }
+// ----------------------------------------
+    @Override
+    public InputStream getContent( Uri u, long skip ) {
+        try {
+            if( uri != null && !uri.getHost().equals( u.getHost() ) )
+                return null;
+            uri = u;
+            if( connectAndLogin( null ) > 0 ) {
+                // TODO???
+            }
+        } catch( Exception e ) {
+            Log.e( TAG, u.getPath(), e );
+        }
+        return null;
+    }
+    @Override
+    public OutputStream saveContent( Uri u ) {
+        try {
+            if( uri != null && !uri.getHost().equals( u.getHost() ) )
+                return null;
+            uri = u;
+            if( connectAndLogin( null ) > NEUTRAL ) {
+                // TODO???
+            }
+        } catch( Exception e ) {
+            Log.e( TAG, u.getPath(), e );
+        }
+        return null;
+    }
+    @Override
+    public void closeStream( Closeable s ) {
+        try {
+            if( s != null )
+                s.close();
+        } catch( IOException e ) {
+            e.printStackTrace();
+        }
+    }
+    
+
 }

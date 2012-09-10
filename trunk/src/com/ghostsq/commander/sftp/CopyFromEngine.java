@@ -11,6 +11,7 @@ import android.net.wifi.WifiManager.WifiLock;
 import android.os.Handler;
 import android.util.Log;
 
+import ch.ethz.ssh2.SFTPException;
 import ch.ethz.ssh2.SFTPv3FileHandle;
 
 import com.ghostsq.commander.Commander;
@@ -54,7 +55,7 @@ class CopyFromEngine extends SFTPEngineBase
                   sendReceiveReq( recipient_hash, dest_folder );
                   return;
             }
-            sendResult( Utils.getOpReport( ctx, total, Utils.RR.copied.r() ) );
+            sendResult( Utils.getOpReport( ctx, total, move ? Utils.RR.moved.r() : Utils.RR.copied.r() ) );
         } catch( InterruptedException e ) {
             Log.e( TAG, null, e );
             error( ctx.getString( Utils.RR.interrupted.r() ) );
@@ -117,7 +118,14 @@ class CopyFromEngine extends SFTPEngineBase
                         }
                         progressMessage = ctx.getString( Utils.RR.retrieving.r(), sftp_path_name ); 
                         sendProgress( progressMessage, 0 );
-                        SFTPv3FileHandle sftp_file = sftp.openFileRO( sftp_path_name );
+                        SFTPv3FileHandle sftp_file = null;
+                        try {
+                            sftp_file = sftp.openFileRO( sftp_path_name );
+                        } catch( SFTPException e ) {    // not critical error
+                            error( ctx.getString( Utils.RR.failed.r() ) + " " + sftp_path_name );
+                            continue;
+                        }
+                            
                         FileOutputStream out = new FileOutputStream( dest_file );
                         byte buf[] = new byte[BLOCK_SIZE];
                         long done = 0;
@@ -151,6 +159,9 @@ class CopyFromEngine extends SFTPEngineBase
                             }
                             sftp.closeFile( sftp_file );
                             out.close();
+                            
+                            if( move )
+                                sftp.rm( sftp_path_name );
                         }
                         catch( Exception e ) {
                             Log.e( TAG, "file: " + sftp_path_name, e );
