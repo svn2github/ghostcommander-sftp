@@ -76,7 +76,7 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
             sendResult( Utils.getOpReport( ctx, cnt, move ? Utils.RR.moved.r() : Utils.RR.copied.r() ) );
             super.run();
         } catch( IOException e ) {
-            // TODO Auto-generated catch block
+            sendProgress( e.getLocalizedMessage(), Commander.OPERATION_FAILED );
             e.printStackTrace();
         } catch( InterruptedException e ) {
             // TODO Auto-generated catch block

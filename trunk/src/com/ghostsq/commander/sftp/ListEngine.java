@@ -99,6 +99,7 @@ class ListEngine extends Engine implements ServerHostKeyVerifier {
             }
         }
         catch( IOException e ) {
+            sendProgress( e.getLocalizedMessage(), Commander.OPERATION_FAILED );
             e.printStackTrace();
         }
         catch( Exception e ) {

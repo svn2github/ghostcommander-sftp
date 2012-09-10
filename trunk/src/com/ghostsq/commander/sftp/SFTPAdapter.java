@@ -15,6 +15,7 @@ import android.util.SparseBooleanArray;
 import ch.ethz.ssh2.Connection;
 import ch.ethz.ssh2.SFTPv3Client;
 import ch.ethz.ssh2.SFTPv3DirectoryEntry;
+import ch.ethz.ssh2.SFTPv3FileHandle;
 import ch.ethz.ssh2.ServerHostKeyVerifier;
 
 import com.ghostsq.commander.Commander;
@@ -137,6 +138,7 @@ public class SFTPAdapter extends CommanderAdapterBase {
                 return NO_LOGIN;
             }
         } catch( Exception e ) {
+            Log.e( TAG, null, e );
             disconnect();
         }
         return NO_CONNECT;
@@ -224,6 +226,13 @@ public class SFTPAdapter extends CommanderAdapterBase {
         }
     }
 
+    @Override
+    public Uri getItemUri( int position ) {
+        Uri u = getUri();
+        if( u == null ) return null;
+        return u.buildUpon().appendEncodedPath( getItemName( position, false ) ).build();
+    }
+    
     @Override
     public String getItemName( int position, boolean full ) {
         if( items != null && position > 0 && position <= items.length ) {
@@ -416,14 +425,76 @@ public class SFTPAdapter extends CommanderAdapterBase {
         items = null;
     }
 // ----------------------------------------
+    
+    class SFTPFileInputStream extends InputStream {
+        SFTPv3FileHandle sftp_file;
+        long             pos, mark;
+        
+        SFTPFileInputStream( SFTPv3FileHandle sftp_file_, long skip ) {
+            sftp_file = sftp_file_;
+            pos = skip;
+        }
+        
+        @Override
+        public void close() throws IOException {
+            sftp_file.getClient().closeFile( sftp_file );
+        }
+        
+        @Override
+        public boolean markSupported() {
+            return false;
+        }
+
+        @Override
+        public void mark(int readlimit) {
+            mark = pos;
+        }
+        
+        @Override
+        public void   reset() {
+            pos = mark;
+        }
+
+        @Override
+        public int read() throws IOException {
+            byte[] ba = new byte[1];
+            sftp_file.getClient().read( sftp_file, pos++, ba, 0, 1 );
+            return ba[0];
+        }
+        
+        @Override
+        public int read( byte[] ba ) throws IOException {
+            int n = sftp_file.getClient().read( sftp_file, pos, ba, 0, ba.length > 32768 ? 32768 : ba.length );
+            pos += n;
+            return n;
+        }
+        
+        @Override
+        public int read( byte[] ba, int off, int len ) throws IOException {
+            int n = sftp_file.getClient().read( sftp_file, pos, ba, off, len > 32768 ? 32768 : len );
+            pos += n;
+            return n;
+        }
+        
+        @Override
+        public long skip( long n ) throws IOException {
+            pos += n;
+            return n;
+        }
+    }
+    
     @Override
     public InputStream getContent( Uri u, long skip ) {
         try {
             if( uri != null && !uri.getHost().equals( u.getHost() ) )
                 return null;
             uri = u;
-            if( connectAndLogin( null ) > 0 ) {
-                // TODO???
+            String sftp_path_name = u.getPath();
+            if( Utils.str( sftp_path_name ) && connectAndLogin( null ) > 0 && client != null ) {
+                SFTPv3FileHandle sftp_file = client.openFileRO( sftp_path_name );
+                if( sftp_file != null && !sftp_file.isClosed() ) {
+                    return new SFTPFileInputStream( sftp_file, skip );
+                }
             }
         } catch( Exception e ) {
             Log.e( TAG, u.getPath(), e );
