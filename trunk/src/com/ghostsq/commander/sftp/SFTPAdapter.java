@@ -426,62 +426,6 @@ public class SFTPAdapter extends CommanderAdapterBase {
     }
 // ----------------------------------------
     
-    class SFTPFileInputStream extends InputStream {
-        SFTPv3FileHandle sftp_file;
-        long             pos, mark;
-        
-        SFTPFileInputStream( SFTPv3FileHandle sftp_file_, long skip ) {
-            sftp_file = sftp_file_;
-            pos = skip;
-        }
-        
-        @Override
-        public void close() throws IOException {
-            sftp_file.getClient().closeFile( sftp_file );
-        }
-        
-        @Override
-        public boolean markSupported() {
-            return false;
-        }
-
-        @Override
-        public void mark(int readlimit) {
-            mark = pos;
-        }
-        
-        @Override
-        public void   reset() {
-            pos = mark;
-        }
-
-        @Override
-        public int read() throws IOException {
-            byte[] ba = new byte[1];
-            sftp_file.getClient().read( sftp_file, pos++, ba, 0, 1 );
-            return ba[0];
-        }
-        
-        @Override
-        public int read( byte[] ba ) throws IOException {
-            int n = sftp_file.getClient().read( sftp_file, pos, ba, 0, ba.length > 32768 ? 32768 : ba.length );
-            pos += n;
-            return n;
-        }
-        
-        @Override
-        public int read( byte[] ba, int off, int len ) throws IOException {
-            int n = sftp_file.getClient().read( sftp_file, pos, ba, off, len > 32768 ? 32768 : len );
-            pos += n;
-            return n;
-        }
-        
-        @Override
-        public long skip( long n ) throws IOException {
-            pos += n;
-            return n;
-        }
-    }
     
     @Override
     public InputStream getContent( Uri u, long skip ) {
@@ -492,9 +436,8 @@ public class SFTPAdapter extends CommanderAdapterBase {
             String sftp_path_name = u.getPath();
             if( Utils.str( sftp_path_name ) && connectAndLogin( null ) > 0 && client != null ) {
                 SFTPv3FileHandle sftp_file = client.openFileRO( sftp_path_name );
-                if( sftp_file != null && !sftp_file.isClosed() ) {
+                if( sftp_file != null && !sftp_file.isClosed() )
                     return new SFTPFileInputStream( sftp_file, skip );
-                }
             }
         } catch( Exception e ) {
             Log.e( TAG, u.getPath(), e );
@@ -507,8 +450,11 @@ public class SFTPAdapter extends CommanderAdapterBase {
             if( uri != null && !uri.getHost().equals( u.getHost() ) )
                 return null;
             uri = u;
-            if( connectAndLogin( null ) > NEUTRAL ) {
-                // TODO???
+            String sftp_path_name = u.getPath();
+            if( Utils.str( sftp_path_name ) && connectAndLogin( null ) > NEUTRAL && client != null ) {
+                SFTPv3FileHandle sftp_file = client.createFileTruncate( sftp_path_name );
+                if( sftp_file != null && !sftp_file.isClosed() )
+                    return new SFTPFileOutputStream( sftp_file );
             }
         } catch( Exception e ) {
             Log.e( TAG, u.getPath(), e );

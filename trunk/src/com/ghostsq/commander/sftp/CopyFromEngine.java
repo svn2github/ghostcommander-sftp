@@ -121,7 +121,7 @@ class CopyFromEngine extends SFTPEngineBase
                         SFTPv3FileHandle sftp_file = null;
                         try {
                             sftp_file = sftp.openFileRO( sftp_path_name );
-                        } catch( SFTPException e ) {    // not critical error
+                        } catch( SFTPException e ) {    // not a critical error
                             error( ctx.getString( Utils.RR.failed.r() ) + " " + sftp_path_name );
                             continue;
                         }
