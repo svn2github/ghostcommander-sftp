@@ -106,7 +106,7 @@ public class SFTPAdapter extends CommanderAdapterBase {
                 conn.getConnectionInfo();   // is there any other way to know it was connected already? 
             } catch( Throwable e ) {
                 client = null;
-                conn.connect( verifier );
+                conn.connect( verifier, 10000, 10000 );
             }
             if( conn.isAuthenticationComplete() ) {
                 if( client == null ) {
