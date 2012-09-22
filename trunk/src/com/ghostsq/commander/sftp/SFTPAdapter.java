@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.PrintStream;
 import java.util.Arrays;
 
 import android.net.Uri;
@@ -14,7 +13,6 @@ import android.util.SparseBooleanArray;
 
 import ch.ethz.ssh2.Connection;
 import ch.ethz.ssh2.SFTPv3Client;
-import ch.ethz.ssh2.SFTPv3DirectoryEntry;
 import ch.ethz.ssh2.SFTPv3FileHandle;
 import ch.ethz.ssh2.ServerHostKeyVerifier;
 
@@ -425,11 +423,15 @@ public class SFTPAdapter extends CommanderAdapterBase {
         items = null;
     }
 // ----------------------------------------
-    
+
+    private int content_requests_counter = 0;
     
     @Override
     public InputStream getContent( Uri u, long skip ) {
         try {
+            Log.v( TAG, "getContent() was called, " + ++content_requests_counter );
+            
+            
             if( uri != null && !uri.getHost().equals( u.getHost() ) )
                 return null;
             uri = u;
@@ -438,9 +440,12 @@ public class SFTPAdapter extends CommanderAdapterBase {
                 SFTPv3FileHandle sftp_file = client.openFileRO( sftp_path_name );
                 if( sftp_file != null && !sftp_file.isClosed() )
                     return new SFTPFileInputStream( sftp_file, skip );
+                else
+                    Log.e( TAG, "Can't opent the requested file. " + u );
             }
+            else Log.e( TAG, "Can't connect. Reqested URI: " + u );
         } catch( Exception e ) {
-            Log.e( TAG, u.getPath(), e );
+            Log.e( TAG, "Exception on request of the file " + u, e );
         }
         return null;
     }
@@ -464,12 +469,12 @@ public class SFTPAdapter extends CommanderAdapterBase {
     @Override
     public void closeStream( Closeable s ) {
         try {
+            Log.v( TAG, "closeStream() was called, " + --content_requests_counter );
+
             if( s != null )
                 s.close();
         } catch( IOException e ) {
             e.printStackTrace();
         }
     }
-    
-
 }
