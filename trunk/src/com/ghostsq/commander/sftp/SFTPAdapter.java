@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
+import java.util.List;
 
 import android.net.Uri;
 import android.util.Log;
@@ -397,6 +398,43 @@ public class SFTPAdapter extends CommanderAdapterBase {
         }
         return item;
     }
+    
+    @Override
+    public Item getItem( Uri u ) {
+        try {
+            if( connectAndLogin( null ) > 0 ) {
+                List<String> segs = u.getPathSegments();
+                if( segs.size() == 0 ) {
+                    Item item = new Item( "/" );
+                    item.dir = true;
+                    return item;
+                }
+                String prt_path = ""; 
+                for( int i = 0; i < segs.size()-1; i++ ) {
+                    prt_path += "/" + segs.get( i );
+                }
+                LsItem[] subItems = ftp.getDirList( prt_path );
+                if( subItems != null ) {
+                    String fn = segs.get( segs.size() - 1 );
+                    for( int i = 0; i < subItems.length; i++ ) {
+                        LsItem ls_item = subItems[i];
+                        String ifn = ls_item.getName();
+                        if( fn.equals( ifn ) ) {
+                            Item item = new Item( ifn );
+                            item.size = ls_item.length();
+                            item.date = ls_item.getDate();
+                            item.dir = ls_item.isDirectory();
+                            return item;
+                        }
+                    }
+                }
+            }
+        } catch( Throwable e ) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+    
     private final LsItem[] bitsToItems( SparseBooleanArray cis ) {
         try {
             int counter = 0;
