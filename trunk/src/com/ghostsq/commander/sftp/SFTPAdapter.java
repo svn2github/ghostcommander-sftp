@@ -139,7 +139,7 @@ public class SFTPAdapter extends CommanderAdapterBase {
                 return NO_LOGIN;
             }
         } catch( Exception e ) {
-            Log.e( TAG, null, e );
+            Log.e( TAG, uri.toString(), e );
             disconnect();
         }
         return NO_CONNECT;
@@ -436,7 +436,7 @@ public class SFTPAdapter extends CommanderAdapterBase {
                 }
             }
         } catch( Throwable e ) {
-            e.printStackTrace();
+            Log.e( TAG, u.toString(), e );
         }
         return null;
     }
@@ -462,9 +462,16 @@ public class SFTPAdapter extends CommanderAdapterBase {
     @Override
     public void prepareToDestroy() {
         super.prepareToDestroy();
-        client = null;
-        if( conn != null ) conn.close();
+        if( client != null ) {
+            client.close(); // probably, this should be in a separate thread to be compatible with ICS and up
+            client = null;
+        }
+        if( conn != null ) {
+            conn.close();
+            conn = null;
+        }
         items = null;
+        uri = null;
     }
 // ----------------------------------------
 
@@ -518,7 +525,7 @@ public class SFTPAdapter extends CommanderAdapterBase {
             if( s != null )
                 s.close();
         } catch( IOException e ) {
-            e.printStackTrace();
+            Log.e( TAG, "closeStream()" + (uri != null ? uri.toString() : ""), e );
         }
     }
 }
