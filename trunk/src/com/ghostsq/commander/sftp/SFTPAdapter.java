@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Vector;
 
 import android.net.Uri;
 import android.util.Log;
@@ -14,6 +15,7 @@ import android.util.SparseBooleanArray;
 
 import ch.ethz.ssh2.Connection;
 import ch.ethz.ssh2.SFTPv3Client;
+import ch.ethz.ssh2.SFTPv3DirectoryEntry;
 import ch.ethz.ssh2.SFTPv3FileHandle;
 import ch.ethz.ssh2.ServerHostKeyVerifier;
 
@@ -402,30 +404,34 @@ public class SFTPAdapter extends CommanderAdapterBase {
     @Override
     public Item getItem( Uri u ) {
         try {
-            if( connectAndLogin( null ) > 0 ) {
-                List<String> segs = u.getPathSegments();
-                if( segs.size() == 0 ) {
-                    Item item = new Item( "/" );
-                    item.dir = true;
-                    return item;
-                }
-                String prt_path = ""; 
-                for( int i = 0; i < segs.size()-1; i++ ) {
-                    prt_path += "/" + segs.get( i );
-                }
-                LsItem[] subItems = ftp.getDirList( prt_path );
-                if( subItems != null ) {
-                    String fn = segs.get( segs.size() - 1 );
-                    for( int i = 0; i < subItems.length; i++ ) {
-                        LsItem ls_item = subItems[i];
+            List<String> segs = u.getPathSegments();
+            if( segs.size() == 0 ) {
+                Item item = new Item( "/" );
+                item.dir = true;
+                return item;
+            }
+            String prt_path = ""; 
+            for( int i = 0; i < segs.size()-1; i++ ) {
+                prt_path += "/" + segs.get( i );
+            }
+            String fn = segs.get( segs.size() - 1 );
+            if( fn == null ) return null;
+            uri = u;
+            if( connectAndLogin( null ) > 0 && client != null ) {
+                Vector<SFTPv3DirectoryEntry> dir_entries = client.ls( prt_path );
+                
+                if( dir_entries != null ) {
+                    
+                    int num_entries = dir_entries.size();
+                    for( int i = 0; i < num_entries; i++ ) {
+                        if( !fn.equals( dir_entries.get(i).filename ) ) continue;
+                        LsItem ls_item = new LsItem( dir_entries.get(i).longEntry );
                         String ifn = ls_item.getName();
-                        if( fn.equals( ifn ) ) {
-                            Item item = new Item( ifn );
-                            item.size = ls_item.length();
-                            item.date = ls_item.getDate();
-                            item.dir = ls_item.isDirectory();
-                            return item;
-                        }
+                        Item item = new Item( ifn );
+                        item.size = ls_item.length();
+                        item.date = ls_item.getDate();
+                        item.dir = ls_item.isDirectory();
+                        return item;
                     }
                 }
             }
