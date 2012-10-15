@@ -36,7 +36,15 @@ public class SFTPAdapter extends CommanderAdapterBase {
     private Credentials  crd;
     private Uri          uri;
     private LsItem[]     items = null;
+    
+    private static int   instance_count = 0;
 
+    @Override
+    public void Init( Commander c ) {
+        super.Init( c );
+        Log.d( TAG, "Created instance #" + ++instance_count );
+    }
+    
     @Override
     public String toString() {
         if( uri == null )
@@ -104,7 +112,7 @@ public class SFTPAdapter extends CommanderAdapterBase {
                 conn = new Connection( host );
             }
             try {
-                conn.getConnectionInfo();   // is there any other way to know it was connected already? 
+                conn.getConnectionInfo();   // is there any better way to know if it was connected already? 
             } catch( Throwable e ) {
                 client = null;
                 conn.connect( verifier, 10000, 10000 );
@@ -472,6 +480,9 @@ public class SFTPAdapter extends CommanderAdapterBase {
         }
         items = null;
         uri = null;
+        
+        Log.d( TAG, "Destroying instance #" + instance_count-- );
+        
     }
 // ----------------------------------------
 
