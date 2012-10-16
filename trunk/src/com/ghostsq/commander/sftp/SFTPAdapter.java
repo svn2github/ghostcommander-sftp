@@ -14,6 +14,7 @@ import android.util.Log;
 import android.util.SparseBooleanArray;
 
 import ch.ethz.ssh2.Connection;
+import ch.ethz.ssh2.InteractiveCallback;
 import ch.ethz.ssh2.SFTPv3Client;
 import ch.ethz.ssh2.SFTPv3DirectoryEntry;
 import ch.ethz.ssh2.SFTPv3FileHandle;
@@ -29,7 +30,7 @@ import com.ghostsq.commander.utils.Credentials;
 import com.ghostsq.commander.utils.LsItem;
 import com.ghostsq.commander.utils.Utils;
 
-public class SFTPAdapter extends CommanderAdapterBase {
+public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCallback {
     private final static String TAG = "SFTPAdapter";
     private Connection   conn;
     private SFTPv3Client client;
@@ -135,7 +136,16 @@ public class SFTPAdapter extends CommanderAdapterBase {
                 }
                 crd = new Credentials( ui );
             }
-            if( conn.authenticateWithPassword( crd.getUserName(), crd.getPassword() ) ) {
+            
+            boolean auth_ok = false;
+
+            if( conn.isAuthMethodAvailable( crd.getUserName(), "password" ) )
+                auth_ok = conn.authenticateWithPassword( crd.getUserName(), crd.getPassword() );
+
+            if( !auth_ok && conn.isAuthMethodAvailable( crd.getUserName(), "keyboard-interactive") )
+                auth_ok = conn.authenticateWithKeyboardInteractive( crd.getUserName(), this );
+                
+            if( auth_ok ) {
                 if( client == null ) {
                     client = new SFTPv3Client( conn /*, System.out*/ );
                     client.setCharset( "UTF-8" );
@@ -151,6 +161,24 @@ public class SFTPAdapter extends CommanderAdapterBase {
             disconnect();
         }
         return NO_CONNECT;
+    }
+
+    /**
+     * InteractiveCallback implementation
+     */
+    @Override
+    public String[] replyToChallenge( String name, String instruction, int numPrompts, String[] prompt, boolean[] echo ) throws Exception {
+        Log.d( TAG, "name: " + name );
+        Log.d( TAG, "instruction: " + instruction );
+        Log.d( TAG, "numPrompts: " + numPrompts );
+        Log.d( TAG, "prompts: " + prompt.length );
+        for( String p : prompt ) {
+            Log.d( TAG, "prompt: " + p );
+        }
+        String[] response = new String[numPrompts];
+        for( int i = 0; i < numPrompts; i++ )
+            response[i] = crd.getPassword();
+        return response;
     }
     
     public void disconnect() {
