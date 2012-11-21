@@ -128,15 +128,19 @@ class CopyFromEngine extends SFTPEngineBase
                             
                         FileOutputStream out = new FileOutputStream( dest_file );
                         byte buf[] = new byte[BLOCK_SIZE];
-                        long done = 0;
+                        long done = 0, nn = 0;
                         int  n = 0;
                         int so_far = (int)(byte_count * conv);
                         try {
                             String retr_s = ctx.getString( Utils.RR.retrieving.r(), sftp_path_name );
                             String   sz_s = Utils.getHumanSize( f.length() );
                             int speed = 0;
+                            long start_time = 0;
                             while( true ) {
-                                long start_time = System.currentTimeMillis();
+                                if( nn == 0 ) {
+                                    start_time = System.currentTimeMillis();
+                                    sendProgress( retr_s + sizeOfsize( done, sz_s ), so_far, (int)(byte_count * conv), speed );
+                                }
                                 if( isStopReq() ) {
                                     sftp.closeFile( sftp_file );
                                     out.close();
@@ -153,9 +157,10 @@ class CopyFromEngine extends SFTPEngineBase
                                 byte_count += n;
                                 done       += n;
                                 long time_delta = System.currentTimeMillis() - start_time;
-                                if( time_delta > 0 )
-                                    speed = (int)(1000 * n / time_delta);
-                                sendProgress( retr_s + sizeOfsize( done, sz_s ), so_far, (int)(byte_count * conv), speed );
+                                if( time_delta > 1000 ) {
+                                    speed = (int)(1000 * nn / time_delta);
+                                    nn = 0;
+                                }
                             }
                             sftp.closeFile( sftp_file );
                             out.close();

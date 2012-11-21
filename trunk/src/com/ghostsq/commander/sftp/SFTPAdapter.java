@@ -52,10 +52,10 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             return "";
         String ui = uri.getUserInfo();
         if( ui != null && crd == null )
-            return Favorite.screenPwd( uri );
+            return Utils.mbAddSl( Favorite.screenPwd( uri ) );
         if( crd == null )
-            return uri.toString();
-        return Favorite.screenPwd( Utils.getUriWithAuth( uri, crd ) );    
+            return Utils.mbAddSl( uri.toString() );
+        return Utils.mbAddSl( Favorite.screenPwd( Utils.getUriWithAuth( uri, crd ) ) );    
     }
     
     @Override
@@ -78,7 +78,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
 
     @Override
     public Uri getUri() {
-        return uri;
+        return uri.buildUpon().encodedPath( Utils.mbAddSl( uri.getEncodedPath() ) ).build();
     }
 
     @Override

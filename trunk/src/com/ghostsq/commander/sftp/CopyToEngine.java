@@ -63,9 +63,10 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
                 return;
             }
             wifiLock.acquire();
-            String dest_path = adapter.getUri().getPath();
+            String dest_path = Utils.mbAddSl(adapter.getUri().getPath() );
             if( !Utils.str( dest_path ) )
                 dest_path = "/";
+                 
             int cnt = copyFiles( mList, dest_path );
             wifiLock.release();
             if( del_src_dir ) {
@@ -133,7 +134,7 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
                         
                         FileInputStream in = new FileInputStream( f );
                         byte buf[] = new byte[BLOCK_SIZE];
-                        long done = 0;
+                        long done = 0, nn = 0;
                         int  n = 0;
                         int  so_far = (int)(byte_count * conv);
                         try {
@@ -141,17 +142,22 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
                             String     sz_s = Utils.getHumanSize( f.length() );
                             int speed = 0;
                             sendProgress( cur_op_s + sizeOfsize( done, sz_s ), so_far, 0, 0 );
+                            long start_time = 0;
                             while( true ) {
-                                long start_time = System.currentTimeMillis();
+                                if( nn == 0 ) {
+                                    start_time = System.currentTimeMillis();
+                                    sendProgress( cur_op_s + sizeOfsize( done, sz_s ), so_far, (int)(byte_count * conv), speed );
+                                }
                                 n = in.read( buf );
                                 if( n < 0 ) break;
                                 sftp.write( new_sftp_file, done, buf, 0, n );
                                 byte_count += n;
                                 done       += n;
                                 long time_delta = System.currentTimeMillis() - start_time;
-                                if( time_delta > 0 )
-                                    speed = (int)(1000 * n / time_delta);
-                                sendProgress( cur_op_s + sizeOfsize( done, sz_s ), so_far, (int)(byte_count * conv), speed );
+                                if( time_delta > 1000 ) {
+                                    speed = (int)(1000 * nn / time_delta);
+                                    nn = 0;
+                                }
                             }
                             in.close();
                             sftp.closeFile( new_sftp_file );
