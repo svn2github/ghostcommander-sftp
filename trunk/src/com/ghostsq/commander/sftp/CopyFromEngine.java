@@ -29,7 +29,6 @@ class CopyFromEngine extends SFTPEngineBase
     private   boolean       move;
     private   int           recipient_hash;
     protected WifiLock      wifiLock;
-    protected String        progressMessage = null;
 
     CopyFromEngine( Handler h, Commander c, SFTPAdapter a, LsItem[] list, File dest, boolean move_, int rec_h ) {
         super( h, a, list );
@@ -76,7 +75,7 @@ class CopyFromEngine extends SFTPEngineBase
                         dir_size += f.length();
                 }
             }
-            double conv = 100. / (double)dir_size;
+            double conv = PERC / (double)dir_size;
             for( int i = 0; i < list.length; i++ ) {
                 if( stop || isInterrupted() ) {
                     error( ctx.getString( Utils.RR.interrupted.r() ) );
@@ -116,8 +115,6 @@ class CopyFromEngine extends SFTPEngineBase
                                 }
                             }
                         }
-                        progressMessage = ctx.getString( Utils.RR.retrieving.r(), sftp_path_name ); 
-                        sendProgress( progressMessage, 0 );
                         SFTPv3FileHandle sftp_file = null;
                         try {
                             sftp_file = sftp.openFileRO( sftp_path_name );
@@ -132,36 +129,40 @@ class CopyFromEngine extends SFTPEngineBase
                         int  n = 0;
                         int so_far = (int)(byte_count * conv);
                         try {
-                            String retr_s = ctx.getString( Utils.RR.retrieving.r(), sftp_path_name );
+                            int pnl = sftp_path_name.length();
+                            String retr_s = ctx.getString( Utils.RR.retrieving.r(), 
+                                    pnl > CUT_LEN ? "\u2026" + sftp_path_name.substring( pnl - CUT_LEN ) : sftp_path_name );
                             String   sz_s = Utils.getHumanSize( f.length() );
                             int speed = 0;
                             long start_time = 0;
                             while( true ) {
-                                if( nn == 0 ) {
-                                    start_time = System.currentTimeMillis();
-                                    sendProgress( retr_s + sizeOfsize( done, sz_s ), so_far, (int)(byte_count * conv), speed );
-                                }
                                 if( isStopReq() ) {
                                     sftp.closeFile( sftp_file );
                                     out.close();
                                     error( ctx.getString( Utils.RR.fail_del.r(), dest_file.getName() ) );
                                     dest_file.delete();
-                                    break;
+                                    return counter;
+                                }
+                                if( nn == 0 ) {
+                                    start_time = System.currentTimeMillis();
+                                    sendProgress( retr_s + sizeOfsize( done, sz_s ), so_far, (int)(byte_count * conv), speed );
                                 }
                                 n = sftp.read( sftp_file, done, buf, 0, BLOCK_SIZE );
                                 if( n < 0 ) {
-                                    Log.w( TAG, "EOF is reached" );
+                                    //Log.w( TAG, "EOF is reached" );
                                     break;
                                 }                                
                                 out.write( buf, 0, n );
                                 byte_count += n;
                                 done       += n;
+                                nn         += n;
                                 long time_delta = System.currentTimeMillis() - start_time;
-                                if( time_delta > 1000 ) {
-                                    speed = (int)(1000 * nn / time_delta);
+                                if( time_delta > DELAY ) {
+                                    speed = (int)(MILLI * nn / time_delta);
                                     nn = 0;
                                 }
                             }
+                            sendProgress( retr_s + sizeOfsize( done, sz_s ), so_far, (int)(byte_count * conv), speed );
                             sftp.closeFile( sftp_file );
                             out.close();
                             
@@ -177,7 +178,6 @@ class CopyFromEngine extends SFTPEngineBase
                             dest_file.delete();
                             break;
                         }
-                        progressMessage = "";
                     }
                     Date ftp_file_date = f.getDate();
                     if( ftp_file_date != null )

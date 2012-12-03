@@ -95,7 +95,7 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
                 if( !f.isDirectory() )
                     dir_size += f.length();
             }
-            double conv = 100./(double)dir_size;
+            double conv = PERC/(double)dir_size;
             for( int i = 0; i < num; i++ ) {
                 if( stop || isInterrupted() ) {
                     error( ctx.getString( Utils.RR.interrupted.r() ) );
@@ -130,20 +130,26 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
                         if( !noErrors() ) break;
                     } else if( f.isFile() ) {
                         SFTPv3FileHandle new_sftp_file = sftp.createFile( sftp_fn, null ); // TODO: set correct attributes
-                       
-                        
                         FileInputStream in = new FileInputStream( f );
                         byte buf[] = new byte[BLOCK_SIZE];
                         long done = 0, nn = 0;
                         int  n = 0;
                         int  so_far = (int)(byte_count * conv);
                         try {
-                            String cur_op_s = ctx.getString( Utils.RR.uploading.r(), f.getAbsolutePath() );
+                            String path_name = f.getAbsolutePath();
+                            int pnl = path_name.length();
+                            String cur_op_s = ctx.getString( Utils.RR.uploading.r(), 
+                                    pnl > CUT_LEN ? "\u2026" + path_name.substring( pnl - CUT_LEN ) : path_name );
                             String     sz_s = Utils.getHumanSize( f.length() );
                             int speed = 0;
-                            sendProgress( cur_op_s + sizeOfsize( done, sz_s ), so_far, 0, 0 );
                             long start_time = 0;
                             while( true ) {
+                                if( isStopReq() ) {
+                                    error( ctx.getString( Utils.RR.fail_del.r(), sftp_fn ) );
+                                    sftp.closeFile( new_sftp_file );
+                                    sftp.rm( sftp_fn );
+                                    return counter;
+                                }
                                 if( nn == 0 ) {
                                     start_time = System.currentTimeMillis();
                                     sendProgress( cur_op_s + sizeOfsize( done, sz_s ), so_far, (int)(byte_count * conv), speed );
@@ -153,12 +159,14 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
                                 sftp.write( new_sftp_file, done, buf, 0, n );
                                 byte_count += n;
                                 done       += n;
+                                nn         += n;
                                 long time_delta = System.currentTimeMillis() - start_time;
-                                if( time_delta > 1000 ) {
-                                    speed = (int)(1000 * nn / time_delta);
+                                if( time_delta > DELAY ) {
+                                    speed = (int)(MILLI * nn / time_delta);
                                     nn = 0;
                                 }
                             }
+                            sendProgress( cur_op_s + sizeOfsize( done, sz_s ), so_far, (int)(byte_count * conv), speed );
                             in.close();
                             sftp.closeFile( new_sftp_file );
                         } catch( Exception e ) {
