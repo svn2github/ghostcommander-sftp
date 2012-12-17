@@ -103,10 +103,13 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     public final int connectAndLogin( ServerHostKeyVerifier verifier ) throws IOException, InterruptedException {
         try {
             Uri u = uri; 
+            int port = u.getPort();
+            if( port == -1 ) port = 22;
+            
             String host = u.getHost();
             if( conn == null ) {
                 client = null;
-                conn = new Connection( host );
+                conn = new Connection( host, port );
             }
             if( !host.equalsIgnoreCase( conn.getHostname() ) ) {
                 disconnect();
