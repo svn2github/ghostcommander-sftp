@@ -41,7 +41,7 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
         move = ( move_mode_ & CommanderAdapter.MODE_MOVE ) != 0;
         del_src_dir = ( move_mode_ & CommanderAdapter.MODE_DEL_SRC_DIR ) != 0;
         WifiManager manager = (WifiManager)ctx.getSystemService( Context.WIFI_SERVICE );
-        wifiLock = manager.createWifiLock( TAG );
+        wifiLock = manager.createWifiLock( android.os.Build.VERSION.SDK_INT >= 12 ? 3 : WifiManager.WIFI_MODE_FULL, TAG );
         wifiLock.setReferenceCounted( false );
     }
 
@@ -68,7 +68,6 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
                 dest_path = "/";
                  
             int cnt = copyFiles( mList, dest_path );
-            wifiLock.release();
             if( del_src_dir ) {
                 File src_dir = mList[0].getParentFile();
                 if( src_dir != null )
@@ -82,6 +81,9 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
         } catch( InterruptedException e ) {
             // TODO Auto-generated catch block
             e.printStackTrace();
+        }
+        finally {
+            wifiLock.release();
         }
     }
 

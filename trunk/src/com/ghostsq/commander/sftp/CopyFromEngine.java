@@ -40,7 +40,7 @@ class CopyFromEngine extends SFTPEngineBase
         recipient_hash = rec_h;
 
         WifiManager manager = (WifiManager)ctx.getSystemService( Context.WIFI_SERVICE );
-        wifiLock = manager.createWifiLock( TAG );
+        wifiLock = manager.createWifiLock( android.os.Build.VERSION.SDK_INT >= 12 ? 3 : WifiManager.WIFI_MODE_FULL, TAG );
         wifiLock.setReferenceCounted( false );
     }
     @Override
@@ -48,7 +48,7 @@ class CopyFromEngine extends SFTPEngineBase
         try {
             wifiLock.acquire();
             int total = copyFiles( mList, "" );
-            wifiLock.release();
+            
             
             if( recipient_hash != 0 ) {
                   sendReceiveReq( recipient_hash, dest_folder );
@@ -61,6 +61,8 @@ class CopyFromEngine extends SFTPEngineBase
         } catch( Exception e ) {
             Log.e( TAG, null, e );
             error( ctx.getString( Utils.RR.failed.r(), e.getLocalizedMessage() ) );
+        } finally {
+            wifiLock.release();
         }
     }
     
