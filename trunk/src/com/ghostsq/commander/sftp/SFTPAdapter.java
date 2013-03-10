@@ -10,10 +10,12 @@ import java.util.List;
 import java.util.Vector;
 
 import android.net.Uri;
+import android.os.Environment;
 import android.util.Log;
 import android.util.SparseBooleanArray;
 
 import ch.ethz.ssh2.Connection;
+import ch.ethz.ssh2.ConnectionInfo;
 import ch.ethz.ssh2.InteractiveCallback;
 import ch.ethz.ssh2.SFTPv3Client;
 import ch.ethz.ssh2.SFTPv3DirectoryEntry;
@@ -99,6 +101,21 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     public final static int NEUTRAL     =  0;
     public final static int NO_CONNECT  = -1;
     public final static int NO_LOGIN    = -2;
+
+    private final ConnectionInfo mbConnect( ServerHostKeyVerifier verifier ) {
+        try {
+            return conn.getConnectionInfo();   // is there any better way to know if it was connected already? 
+        } catch( Throwable e ) {
+            client = null;
+            try {
+                return conn.connect( verifier, 10000, 10000 );
+            } catch( IOException e1 ) {
+                Log.e( TAG, "", e1 );
+            }
+        }
+        disconnect();
+        return null;
+    }
     
     public final int connectAndLogin( ServerHostKeyVerifier verifier ) throws IOException, InterruptedException {
         try {
@@ -115,12 +132,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 disconnect();
                 conn = new Connection( host );
             }
-            try {
-                conn.getConnectionInfo();   // is there any better way to know if it was connected already? 
-            } catch( Throwable e ) {
-                client = null;
-                conn.connect( verifier, 10000, 10000 );
-            }
+            if( mbConnect( verifier ) == null ) return NO_CONNECT;
             if( conn.isAuthenticationComplete() ) {
                 if( client == null ) {
                     client = new SFTPv3Client( conn );
@@ -141,12 +153,33 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             }
             
             boolean auth_ok = false;
-
-            if( conn.isAuthMethodAvailable( crd.getUserName(), "password" ) )
-                auth_ok = conn.authenticateWithPassword( crd.getUserName(), crd.getPassword() );
-
+            if( conn.isAuthMethodAvailable( crd.getUserName(), "publickey" ) ) {
+                File key_file = new File( Environment.getExternalStorageDirectory(), 
+                        ".GhostCommander/keys/" + uri.getHost() );
+                if( key_file.exists() )
+                    try {
+                        auth_ok = conn.authenticateWithPublicKey( crd.getUserName(), key_file, crd.getPassword() );
+                    } catch( IOException e ) {
+                        Log.e( TAG, "", e );
+                        disconnect();
+                        if( mbConnect( verifier ) == null ) return NO_CONNECT;
+                    }
+            }
+            if( !auth_ok && conn.isAuthMethodAvailable( crd.getUserName(), "password" ) )
+                try {
+                    auth_ok = conn.authenticateWithPassword( crd.getUserName(), crd.getPassword() );
+                } catch( IOException e ) {
+                    Log.e( TAG, "", e );
+                    disconnect();
+                    if( mbConnect( verifier ) == null ) return NO_CONNECT;
+                }
             if( !auth_ok && conn.isAuthMethodAvailable( crd.getUserName(), "keyboard-interactive") )
-                auth_ok = conn.authenticateWithKeyboardInteractive( crd.getUserName(), this );
+                try {
+                    auth_ok = conn.authenticateWithKeyboardInteractive( crd.getUserName(), this );
+                } catch( IOException e ) {
+                    Log.e( TAG, "", e );
+                    disconnect();
+                }
                 
             if( auth_ok ) {
                 if( client == null ) {
