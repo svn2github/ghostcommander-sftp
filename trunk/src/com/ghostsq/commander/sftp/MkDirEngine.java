@@ -1,14 +1,12 @@
 package com.ghostsq.commander.sftp;
 
-import android.os.Handler;
-
 import com.ghostsq.commander.Commander;
 import com.ghostsq.commander.utils.Utils;
 
 class MkDirEngine extends SFTPEngineBase {
     private String  full_name; 
-    public MkDirEngine( Handler h, SFTPAdapter a, String full_name_ ) {
-        super( h, a, null );
+    public MkDirEngine( SFTPAdapter a, String full_name_ ) {
+        super( a, null );
         full_name = full_name_;
     }
     

@@ -9,8 +9,8 @@ import com.ghostsq.commander.utils.Utils;
 class DelEngine extends SFTPEngineBase {
     private int so_far = 0;
     
-    public DelEngine( Handler h, SFTPAdapter a, LsItem[] list ) {
-        super( h, a, list );
+    public DelEngine( SFTPAdapter a, LsItem[] list ) {
+        super( a, list );
     }
     @Override
     public void run() {

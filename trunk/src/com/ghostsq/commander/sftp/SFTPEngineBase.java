@@ -18,8 +18,7 @@ class SFTPEngineBase extends Engine {
     protected SFTPv3Client    sftp;
     protected LsItem[]        mList;
     
-    protected SFTPEngineBase( Handler h, SFTPAdapter a, LsItem[] list ) {
-        super( h );
+    protected SFTPEngineBase( SFTPAdapter a, LsItem[] list ) {
         adapter = a;
         ctx     = adapter.ctx;
         sftp    = adapter.getClient();

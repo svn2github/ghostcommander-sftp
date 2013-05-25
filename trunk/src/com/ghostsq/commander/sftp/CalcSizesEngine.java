@@ -14,8 +14,8 @@ import com.ghostsq.commander.utils.Utils;
 class CalcSizesEngine extends SFTPEngineBase {
     private int num = 0, dirs = 0, depth = 0;
 
-    CalcSizesEngine( Handler h, SFTPAdapter a, LsItem[] list ) {
-        super( h, a, list );
+    CalcSizesEngine( SFTPAdapter a, LsItem[] list ) {
+        super( a, list );
     }
 
     @Override

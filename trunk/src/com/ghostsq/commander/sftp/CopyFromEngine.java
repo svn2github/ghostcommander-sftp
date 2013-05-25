@@ -16,6 +16,7 @@ import ch.ethz.ssh2.SFTPv3FileHandle;
 
 import com.ghostsq.commander.Commander;
 import com.ghostsq.commander.adapters.CommanderAdapterBase;
+import com.ghostsq.commander.adapters.Engines;
 import com.ghostsq.commander.utils.ForwardCompat;
 import com.ghostsq.commander.utils.LsItem;
 import com.ghostsq.commander.utils.Utils;
@@ -27,17 +28,16 @@ class CopyFromEngine extends SFTPEngineBase
     private   String        src_path;
     private   File          dest_folder;
     private   boolean       move;
-    private   int           recipient_hash;
     protected WifiLock      wifiLock;
 
-    CopyFromEngine( Handler h, Commander c, SFTPAdapter a, LsItem[] list, File dest, boolean move_, int rec_h ) {
-        super( h, a, list );
+    CopyFromEngine( Commander c, SFTPAdapter a, LsItem[] list, File dest, boolean move_, Engines.IReciever recipient_ ) {
+        super( a, list );
         commander = c;
         src_path = Utils.mbAddSl( adapter.getUri().getPath() );
         mList = list;
         dest_folder = dest;
         move = move_;
-        recipient_hash = rec_h;
+        recipient = recipient_;
 
         WifiManager manager = (WifiManager)ctx.getSystemService( Context.WIFI_SERVICE );
         wifiLock = manager.createWifiLock( android.os.Build.VERSION.SDK_INT >= 12 ? 3 : WifiManager.WIFI_MODE_FULL, TAG );
@@ -49,9 +49,8 @@ class CopyFromEngine extends SFTPEngineBase
             wifiLock.acquire();
             int total = copyFiles( mList, "" );
             
-            
-            if( recipient_hash != 0 ) {
-                  sendReceiveReq( recipient_hash, dest_folder );
+            if( recipient != null ) {
+                  sendReceiveReq( dest_folder );
                   return;
             }
             sendResult( Utils.getOpReport( ctx, total, move ? Utils.RR.moved.r() : Utils.RR.copied.r() ) );

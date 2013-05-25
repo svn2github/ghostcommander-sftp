@@ -4,14 +4,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Vector;
-import java.util.Comparator;
 
 import android.content.Context;
 import android.net.Uri;
 import android.os.Handler;
 import android.util.Log;
 
-import ch.ethz.ssh2.KnownHosts;
 import ch.ethz.ssh2.SFTPv3Client;
 import ch.ethz.ssh2.SFTPv3DirectoryEntry;
 import ch.ethz.ssh2.ServerHostKeyVerifier;
@@ -31,7 +29,7 @@ class ListEngine extends Engine implements ServerHostKeyVerifier {
     
     
     ListEngine( Handler h, SFTPAdapter a, Context ctx_, String pass_back_on_done_ ) {
-        super( h );
+        super.setHandler( h );
         ctx = ctx_;
         adapter = a;
         pass_back_on_done = pass_back_on_done_;

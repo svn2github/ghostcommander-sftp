@@ -32,8 +32,7 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
     private   boolean del_src_dir = false;
     private   WifiLock  wifiLock;
     
-    CopyToEngine( Commander c, Handler h, SFTPAdapter a, File[] list, int move_mode_ ) {
-        super( h );
+    CopyToEngine( Commander c, SFTPAdapter a, File[] list, int move_mode_ ) {
         commander = c;
         ctx = commander.getContext();
         mList = list;

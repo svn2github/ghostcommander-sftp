@@ -26,13 +26,15 @@ import com.ghostsq.commander.Commander;
 import com.ghostsq.commander.adapters.CA;
 import com.ghostsq.commander.adapters.CommanderAdapter;
 import com.ghostsq.commander.adapters.CommanderAdapterBase;
+import com.ghostsq.commander.adapters.Engines;
+import com.ghostsq.commander.adapters.Engines.IReciever;
 import com.ghostsq.commander.adapters.FSAdapter;
 import com.ghostsq.commander.favorites.Favorite;
 import com.ghostsq.commander.utils.Credentials;
 import com.ghostsq.commander.utils.LsItem;
 import com.ghostsq.commander.utils.Utils;
 
-public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCallback {
+public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCallback, Engines.IReciever {
     private final static String TAG = "SFTPAdapter";
     private Connection   conn;
     private SFTPv3Client client;
@@ -332,9 +334,8 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         }
         notify( Commander.OPERATION_STARTED );
         String path = Utils.mbAddSl( uri.getPath() );
-        worker = new RenEngine( commander.getContext(), workerHandler, this,
-                 path + items[position - 1].getName(), path + newName );
-        worker.start();
+        commander.startEngine( new RenEngine( commander.getContext(), this,
+                 path + items[position - 1].getName(), path + newName ) );
         return true;
     }
 
@@ -347,12 +348,8 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 notify( s( Utils.RR.copy_err.r() ), Commander.OPERATION_FAILED );
                 return false;
             } 
-            if( worker != null ) {
-                notify( s( Utils.RR.busy.r() ), Commander.OPERATION_FAILED );
-                return false;
-            } 
             File dest = null;
-            int rec_h = 0;
+            Engines.IReciever recipient = null;
             if( to instanceof FSAdapter  ) {
                 String dest_fn = to.toString();
                 dest = new File( dest_fn );
@@ -361,11 +358,11 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                     throw new RuntimeException( ctx.getString( Utils.RR.file_exist.r(), dest_fn ) );
             } else {
                 dest = new File( createTempDir() );
-                rec_h = setRecipient( to ); 
+                recipient = to.getReceiver();
             }
             notify( Commander.OPERATION_STARTED );
-            worker = new CopyFromEngine( workerHandler, commander, this, subItems, dest, move, rec_h );
-            worker.start();
+            CopyFromEngine cfe = new CopyFromEngine( commander, this, subItems, dest, move, recipient );
+            commander.startEngine( cfe );
             return true;
         }
         catch( Exception e ) {
@@ -378,10 +375,6 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     @Override
     public boolean receiveItems( String[] fileURIs, int move_mode ) {
         try {
-            if( isWorkerStillAlive() ) {
-                notify( s( Utils.RR.busy.r() ), Commander.OPERATION_FAILED );
-                return false;
-            }
             if( fileURIs == null || fileURIs.length == 0 ) {
                 notify( s( Utils.RR.copy_err.r() ), Commander.OPERATION_FAILED );
                 return false;
@@ -392,9 +385,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 return false;
             }
             notify( Commander.OPERATION_STARTED );
-            worker = new CopyToEngine( commander, workerHandler, this, list, move_mode );
-            worker.setName( TAG + ".CopyToEngine" );
-            worker.start();
+            commander.startEngine( new CopyToEngine( commander, this, list, move_mode ) );
             return true;
         } catch( Exception e ) {
             notify( "Exception: " + e.getMessage(), Commander.OPERATION_FAILED );
@@ -410,19 +401,15 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     @Override
     public void createFolder( String name ) {
         notify( Commander.OPERATION_STARTED );
-        worker = new MkDirEngine( workerHandler, this, Utils.mbAddSl( uri.getPath() ) + name );
-        worker.start();
+        commander.startEngine( new MkDirEngine( this, Utils.mbAddSl( uri.getPath() ) + name ) );
     }
 
     @Override
     public void reqItemsSize( SparseBooleanArray cis ) {
         try {
             LsItem[] list = bitsToItems( cis );
-            if( worker != null && worker.reqStop() )
-                return;
             notify( Commander.OPERATION_STARTED );
-            worker = new CalcSizesEngine( workerHandler, this, list );
-            worker.start();
+            commander.startEngine( new CalcSizesEngine( this, list ) );
         }
         catch(Exception e) {
         }
@@ -431,17 +418,10 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     @Override
     public boolean deleteItems( SparseBooleanArray cis ) {
         try {
-            if( worker != null ) return false;
             LsItem[] subItems = bitsToItems( cis );
             if( subItems != null ) {
-                if( worker != null ) {
-                    notify( s( Utils.RR.copy_err.r() ), Commander.OPERATION_FAILED );
-                    return false;
-                }
                 notify( Commander.OPERATION_STARTED );
-                worker = new DelEngine( workerHandler, this, subItems );
-                worker.setName( TAG + ".DelEngine" );
-                worker.start();
+                commander.startEngine( new DelEngine( this, subItems ) );
                 return true;
             }
         }
@@ -490,14 +470,13 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             if( fn == null ) return null;
             uri = u;
             if( connectAndLogin( null ) > 0 && client != null ) {
-                Vector<SFTPv3DirectoryEntry> dir_entries = client.ls( prt_path );
-                
+                Vector dir_entries = client.ls( prt_path );
                 if( dir_entries != null ) {
-                    
                     int num_entries = dir_entries.size();
                     for( int i = 0; i < num_entries; i++ ) {
-                        if( !fn.equals( dir_entries.get(i).filename ) ) continue;
-                        LsItem ls_item = new LsItem( dir_entries.get(i).longEntry );
+                        SFTPv3DirectoryEntry entry = (SFTPv3DirectoryEntry)dir_entries.get(i);
+                        if( !fn.equals( entry.filename ) ) continue;
+                        LsItem ls_item = new LsItem( entry.longEntry );
                         String ifn = ls_item.getName();
                         Item item = new Item( ifn );
                         item.size = ls_item.length();
@@ -602,5 +581,10 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         } catch( IOException e ) {
             Log.e( TAG, "closeStream()" + (uri != null ? uri.toString() : ""), e );
         }
+    }
+
+    @Override
+    public IReciever getReceiver() {
+        return this;
     }
 }

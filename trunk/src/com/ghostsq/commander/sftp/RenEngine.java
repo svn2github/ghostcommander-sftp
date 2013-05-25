@@ -14,8 +14,7 @@ class RenEngine extends Engine {
     private String       from, to; 
     private SFTPAdapter  adapter;
     
-    public RenEngine( Context ctx_, Handler h, SFTPAdapter a, String from_, String to_ ) {
-        super( h );
+    public RenEngine( Context ctx_, SFTPAdapter a, String from_, String to_ ) {
         ctx = ctx_;
         adapter = a;
         from = from_;
