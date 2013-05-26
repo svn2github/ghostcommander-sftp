@@ -61,6 +61,7 @@ class CopyFromEngine extends SFTPEngineBase
             Log.e( TAG, null, e );
             error( ctx.getString( Utils.RR.failed.r(), e.getLocalizedMessage() ) );
         } finally {
+            finalize();
             wifiLock.release();
         }
     }

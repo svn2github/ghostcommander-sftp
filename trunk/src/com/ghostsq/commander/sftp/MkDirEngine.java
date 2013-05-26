@@ -19,6 +19,8 @@ class MkDirEngine extends SFTPEngineBase {
         } catch( Exception e ) {
             String msg = ctx.getString( Utils.RR.cant_md.r(), full_name ) + "\n - " + e.getLocalizedMessage();
             sendProgress( msg, Commander.OPERATION_FAILED );
+        } finally {
+            finalize();
         }
     }
 }

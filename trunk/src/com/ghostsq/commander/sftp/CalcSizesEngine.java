@@ -58,6 +58,8 @@ class CalcSizesEngine extends SFTPEngineBase {
             super.run();
         } catch( Exception e ) {
             sendProgress( e.getMessage(), Commander.OPERATION_FAILED );
+        } finally {
+            finalize();
         }
     }
 

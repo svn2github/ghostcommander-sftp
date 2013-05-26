@@ -39,6 +39,7 @@ class ListEngine extends Engine implements ServerHostKeyVerifier {
     }       
     @Override
     public void run() {
+        SFTPv3Client client = null;
         try {
             Log.i( TAG, "ListEngine started" );
             threadStartedAt = System.currentTimeMillis();
@@ -56,7 +57,7 @@ class ListEngine extends Engine implements ServerHostKeyVerifier {
                 sendProgress( ctx.getString( Utils.RR.ftp_connected.r(),  
                         real_host + " (" + crypt + ")", crd.getUserName() ), Commander.OPERATION_STARTED );
 
-            SFTPv3Client client = adapter.getClient();
+            client = adapter.getClient();
             if( client != null ) {
                 Uri u = adapter.getUri();
                 String path = u.getPath();
@@ -104,6 +105,7 @@ class ListEngine extends Engine implements ServerHostKeyVerifier {
             e.printStackTrace();
         }
         finally {
+            if( client != null ) client.close();
             super.run();
         }
         adapter.disconnect();

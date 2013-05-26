@@ -20,6 +20,7 @@ class SFTPFileInputStream extends InputStream {
     @Override
     public void close() throws IOException {
         sftp.closeFile( sftp_file );
+        sftp.close();
     }
     
     @Override

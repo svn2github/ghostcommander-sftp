@@ -25,7 +25,7 @@ class SFTPEngineBase extends Engine {
         mList   = list;
     }
 
-    protected boolean skip( LsItem f ) {
+    protected final boolean skip( LsItem f ) {
         String fn = f.getName();
         if(  "/.".equals( fn ) ||
             "/..".equals( fn ) ||
@@ -34,7 +34,7 @@ class SFTPEngineBase extends Engine {
         return false;
     }
     
-    protected LsItem[] getItems( String full_fn ) {
+    protected final LsItem[] getItems( String full_fn ) {
         try {
             Vector<SFTPv3DirectoryEntry> dir_entries = sftp.ls( full_fn );
             if( dir_entries != null ) {
@@ -51,5 +51,11 @@ class SFTPEngineBase extends Engine {
         }
         error( "No valid entries in " + full_fn );
         return null;
+    }
+    
+    @Override
+    public void finalize() {
+        if( sftp != null ) sftp.close();
+        sftp = null;
     }
 }

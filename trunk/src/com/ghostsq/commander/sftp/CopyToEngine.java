@@ -48,7 +48,6 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
     public void run() {
         
         try {
-            Credentials crd = adapter.getCredentials();
             int cl_res = adapter.connectAndLogin( null );
             if( cl_res < 0 ) {
                 if( cl_res < 0 ) { 
@@ -82,6 +81,8 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
             e.printStackTrace();
         }
         finally {
+            if( sftp != null ) sftp.close();
+            sftp = null;
             wifiLock.release();
         }
     }

@@ -22,14 +22,17 @@ class RenEngine extends Engine {
     }
     @Override
     public void run() {
+        SFTPv3Client sftp = null;
         try {
-            SFTPv3Client sftp = adapter.getClient();
+            sftp = adapter.getClient();
             sftp.mv( from, to );
             sendProgress( null, Commander.OPERATION_COMPLETED_REFRESH_REQUIRED );
             return;
         } catch( Exception e ) {
             String msg = ctx.getString( Utils.RR.failed.r() ) + e.getLocalizedMessage();
             sendProgress( msg, Commander.OPERATION_FAILED );
+        } finally {
+            if( sftp != null ) sftp.close();
         }
     }
 }

@@ -1,7 +1,5 @@
 package com.ghostsq.commander.sftp;
 
-import android.os.Handler;
-
 import com.ghostsq.commander.Commander;
 import com.ghostsq.commander.utils.LsItem;
 import com.ghostsq.commander.utils.Utils;
@@ -22,6 +20,8 @@ class DelEngine extends SFTPEngineBase {
             super.run();
         } catch( Exception e ) {
             sendProgress( e.getMessage(), Commander.OPERATION_FAILED );
+        } finally {
+            finalize();
         }
     }
     private final int deleteFiles( String path, LsItem[] l ) throws Exception {

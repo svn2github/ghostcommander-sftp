@@ -36,14 +36,27 @@ import com.ghostsq.commander.utils.Utils;
 
 public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCallback, Engines.IReciever {
     private final static String TAG = "SFTPAdapter";
-    private Connection   conn;
-    private SFTPv3Client client;
-    private Credentials  crd;
-    private Uri          uri;
-    private LsItem[]     items = null;
+    private SFTPConnection conn;
+    private Credentials    crd;
+    private Uri            uri;
+    private LsItem[]       items = null;
     
     private static int   instance_count = 0;
 
+    private class SFTPConnection extends Connection {
+        public SFTPConnection(String hostname, int port) {
+            super( hostname, port );
+        }
+        public SFTPConnection(String hostname) {
+            super( hostname );
+        }
+        @Override
+        public void finalize() {
+            Log.d( TAG, "SFTPConnection finalizing..." );
+            close();
+        }
+    }
+    
     @Override
     public void Init( Commander c ) {
         super.Init( c );
@@ -94,8 +107,15 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         return mode & ( MODE_SORTING | MODE_HIDDEN | MODE_SORT_DIR );
     }
 
-    public SFTPv3Client getClient() {
-        return client;
+    public synchronized SFTPv3Client getClient() {
+        try {
+            SFTPv3Client client = new SFTPv3Client( conn );
+            client.setCharset( "UTF-8" );
+            return client;
+        } catch( IOException e ) {
+            Log.e( TAG,  "", e );
+        }
+        return null;
     }
     
     public final static int WAS_IN      =  1;
@@ -108,7 +128,6 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         try {
             return conn.getConnectionInfo();   // is there any better way to know if it was connected already? 
         } catch( Throwable e ) {
-            client = null;
             try {
                 return conn.connect( verifier, 10000, 10000 );
             } catch( IOException e1 ) {
@@ -126,27 +145,17 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             if( port == -1 ) port = 22;
             
             String host = u.getHost();
-            if( conn == null ) {
-                client = null;
-                conn = new Connection( host, port );
-            }
-            if( !host.equalsIgnoreCase( conn.getHostname() ) ) {
-                disconnect();
-                conn = new Connection( host );
+            if( conn == null || !host.equalsIgnoreCase( conn.getHostname() ) ) {
+                conn = new SFTPConnection( host, port );
             }
             if( mbConnect( verifier ) == null ) return NO_CONNECT;
             if( conn.isAuthenticationComplete() ) {
-                if( client == null ) {
-                    client = new SFTPv3Client( conn );
-                    client.setCharset( "UTF-8" );
-                }
                 return WAS_IN;
             }
             
             if( crd == null ) {
                 String ui = u.getUserInfo();
                 if( ui == null ) {
-                    client = null;
                     conn.close();
                     Log.w( TAG, "No credentials provided" );
                     return NO_LOGIN;
@@ -184,10 +193,6 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 }
                 
             if( auth_ok ) {
-                if( client == null ) {
-                    client = new SFTPv3Client( conn /*, System.out*/ );
-                    client.setCharset( "UTF-8" );
-                }
                 return LOGGED_IN;
             } else {
                 disconnect();
@@ -217,11 +222,6 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         for( int i = 0; i < numPrompts; i++ )
             response[i] = crd.getPassword();
         return response;
-    }
-    
-    public void disconnect() {
-        client = null;
-        if( conn != null ) conn.close();
     }
     
     @Override
@@ -469,21 +469,30 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             String fn = segs.get( segs.size() - 1 );
             if( fn == null ) return null;
             uri = u;
-            if( connectAndLogin( null ) > 0 && client != null ) {
-                Vector dir_entries = client.ls( prt_path );
-                if( dir_entries != null ) {
-                    int num_entries = dir_entries.size();
-                    for( int i = 0; i < num_entries; i++ ) {
-                        SFTPv3DirectoryEntry entry = (SFTPv3DirectoryEntry)dir_entries.get(i);
-                        if( !fn.equals( entry.filename ) ) continue;
-                        LsItem ls_item = new LsItem( entry.longEntry );
-                        String ifn = ls_item.getName();
-                        Item item = new Item( ifn );
-                        item.size = ls_item.length();
-                        item.date = ls_item.getDate();
-                        item.dir = ls_item.isDirectory();
-                        return item;
+            if( connectAndLogin( null ) > 0 ) {
+                SFTPv3Client client = getClient();
+                if( client == null ) return null;
+                try {
+                    Vector dir_entries = client.ls( prt_path );
+                    if( dir_entries != null ) {
+                        int num_entries = dir_entries.size();
+                        for( int i = 0; i < num_entries; i++ ) {
+                            SFTPv3DirectoryEntry entry = (SFTPv3DirectoryEntry)dir_entries.get(i);
+                            if( !fn.equals( entry.filename ) ) continue;
+                            LsItem ls_item = new LsItem( entry.longEntry );
+                            String ifn = ls_item.getName();
+                            Item item = new Item( ifn );
+                            item.size = ls_item.length();
+                            item.date = ls_item.getDate();
+                            item.dir = ls_item.isDirectory();
+                            return item;
+                        }
                     }
+                } catch( Throwable e ) {
+                    Log.e( TAG, u.toString(), e );
+                }
+                finally {
+                    client.close();
                 }
             }
         } catch( Throwable e ) {
@@ -513,20 +522,23 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     @Override
     public void prepareToDestroy() {
         super.prepareToDestroy();
-        if( client != null ) {
-            client.close(); // probably, this should be in a separate thread to be compatible with ICS and up
-            client = null;
-        }
-        if( conn != null ) {
-            conn.close();
-            conn = null;
-        }
         items = null;
         uri = null;
-        
         Log.d( TAG, "Destroying instance #" + instance_count-- );
-        
     }
+    
+    public void disconnect() {
+        Log.d( TAG, "Disconnecting..." );
+        if( conn != null ) conn.close();
+        conn = null;
+    }
+    
+    @Override
+    public void finalize() {
+        Log.d( TAG, "Finalizing..." );
+        disconnect();
+    }
+    
 // ----------------------------------------
 
     private int content_requests_counter = 0;
@@ -536,12 +548,13 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         try {
             Log.v( TAG, "getContent() was called, " + ++content_requests_counter );
             
-            
             if( uri != null && !uri.getHost().equals( u.getHost() ) )
                 return null;
             uri = u;
             String sftp_path_name = u.getPath();
-            if( Utils.str( sftp_path_name ) && connectAndLogin( null ) > 0 && client != null ) {
+            if( Utils.str( sftp_path_name ) && connectAndLogin( null ) > 0 ) {
+                SFTPv3Client client = getClient();
+                if( client == null ) return null;
                 SFTPv3FileHandle sftp_file = client.openFileRO( sftp_path_name );
                 if( sftp_file != null && !sftp_file.isClosed() )
                     return new SFTPFileInputStream( sftp_file, skip );
@@ -561,7 +574,9 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 return null;
             uri = u;
             String sftp_path_name = u.getPath();
-            if( Utils.str( sftp_path_name ) && connectAndLogin( null ) > NEUTRAL && client != null ) {
+            if( Utils.str( sftp_path_name ) && connectAndLogin( null ) > NEUTRAL ) {
+                SFTPv3Client client = getClient();
+                if( client == null ) return null;
                 SFTPv3FileHandle sftp_file = client.createFileTruncate( sftp_path_name );
                 if( sftp_file != null && !sftp_file.isClosed() )
                     return new SFTPFileOutputStream( sftp_file );
@@ -575,7 +590,6 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     public void closeStream( Closeable s ) {
         try {
             Log.v( TAG, "closeStream() was called, " + --content_requests_counter );
-
             if( s != null )
                 s.close();
         } catch( IOException e ) {

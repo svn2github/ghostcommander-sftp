@@ -17,12 +17,13 @@ public class SFTPFileOutputStream extends OutputStream {
     }
     
     @Override
-    public void   close() throws IOException {
+    public void close() throws IOException {
         sftp.closeFile( sftp_file );
+        sftp.close();
     }
     
     @Override
-    public void   flush() throws IOException {
+    public void flush() throws IOException {
     }
     
     @Override
