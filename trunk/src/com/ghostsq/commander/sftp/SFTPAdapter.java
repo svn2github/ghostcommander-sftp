@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Vector;
 
+import android.content.Context;
 import android.net.Uri;
 import android.os.Environment;
 import android.util.Log;
@@ -55,6 +56,10 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             Log.d( TAG, "SFTPConnection finalizing..." );
             close();
         }
+    }
+    
+    public SFTPAdapter( Context ctx_ ) {
+        super( ctx_ );
     }
     
     @Override
@@ -148,7 +153,8 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             if( conn == null || !host.equalsIgnoreCase( conn.getHostname() ) ) {
                 conn = new SFTPConnection( host, port );
             }
-            if( mbConnect( verifier ) == null ) return NO_CONNECT;
+            if( mbConnect( verifier ) == null ) 
+                return NO_CONNECT;
             if( conn.isAuthenticationComplete() ) {
                 return WAS_IN;
             }
@@ -169,23 +175,26 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                         ".GhostCommander/keys/" + uri.getHost() );
                 if( key_file.exists() )
                     try {
+                        Log.d( TAG, "authenticateWithPublicKey" );
                         auth_ok = conn.authenticateWithPublicKey( crd.getUserName(), key_file, crd.getPassword() );
                     } catch( IOException e ) {
-                        Log.e( TAG, "", e );
+                        Log.w( TAG, "Keyfile " + key_file.getAbsolutePath() + " auth failed" );
                         disconnect();
-                        if( mbConnect( verifier ) == null ) return NO_CONNECT;
+                        return NO_LOGIN;
                     }
             }
             if( !auth_ok && conn.isAuthMethodAvailable( crd.getUserName(), "password" ) )
                 try {
+                    Log.d( TAG, "authenticateWithPassword" );
                     auth_ok = conn.authenticateWithPassword( crd.getUserName(), crd.getPassword() );
                 } catch( IOException e ) {
-                    Log.e( TAG, "", e );
+                    Log.w( TAG, "" );
                     disconnect();
-                    if( mbConnect( verifier ) == null ) return NO_CONNECT;
+                    return NO_LOGIN;
                 }
             if( !auth_ok && conn.isAuthMethodAvailable( crd.getUserName(), "keyboard-interactive") )
                 try {
+                    Log.d( TAG, "authenticateWithKeyboardInteractive" );
                     auth_ok = conn.authenticateWithKeyboardInteractive( crd.getUserName(), this );
                 } catch( IOException e ) {
                     Log.e( TAG, "", e );
