@@ -104,8 +104,17 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     }
 
     @Override
-    public int getType() {
-        return CA.SFTP;
+    public String getScheme() {
+        return "sftp";
+    }
+
+    @Override
+    public boolean hasFeature( Feature feature ) {
+        switch( feature ) {
+        case REAL:
+            return true;
+        default: return super.hasFeature( feature );
+        }
     }
 
     public int getSortMode() {
