@@ -1,6 +1,7 @@
 package com.ghostsq.commander.sftp;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Vector;
 
 import android.content.Context;
@@ -36,7 +37,7 @@ class SFTPEngineBase extends Engine {
     
     protected final LsItem[] getItems( String full_fn ) {
         try {
-            Vector<SFTPv3DirectoryEntry> dir_entries = sftp.ls( full_fn );
+            List<SFTPv3DirectoryEntry> dir_entries = sftp.ls( full_fn );
             if( dir_entries != null ) {
                 int num_entries = dir_entries.size();
                 LsItem[] subItems = LsItem.createArray( num_entries );

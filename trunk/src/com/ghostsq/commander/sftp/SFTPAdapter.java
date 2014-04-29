@@ -491,7 +491,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 SFTPv3Client client = getClient();
                 if( client == null ) return null;
                 try {
-                    Vector dir_entries = client.ls( prt_path );
+                    List dir_entries = client.ls( prt_path );
                     if( dir_entries != null ) {
                         int num_entries = dir_entries.size();
                         for( int i = 0; i < num_entries; i++ ) {
@@ -574,7 +574,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 SFTPv3Client client = getClient();
                 if( client == null ) return null;
                 SFTPv3FileHandle sftp_file = client.openFileRO( sftp_path_name );
-                if( sftp_file != null && !sftp_file.isClosed() )
+                if( sftp_file != null )
                     return new SFTPFileInputStream( sftp_file, skip );
                 else
                     Log.e( TAG, "Can't opent the requested file. " + u );
@@ -596,7 +596,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 SFTPv3Client client = getClient();
                 if( client == null ) return null;
                 SFTPv3FileHandle sftp_file = client.createFileTruncate( sftp_path_name );
-                if( sftp_file != null && !sftp_file.isClosed() )
+                if( sftp_file != null )
                     return new SFTPFileOutputStream( sftp_file );
             }
         } catch( Exception e ) {

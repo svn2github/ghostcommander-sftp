@@ -3,6 +3,7 @@ package com.ghostsq.commander.sftp;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Vector;
 
 import android.content.Context;
@@ -63,7 +64,7 @@ class ListEngine extends Engine implements ServerHostKeyVerifier {
                 String path = u.getPath();
                 if( !Utils.str( path ) ) path = File.separator;
                 @SuppressWarnings("unchecked")
-                Vector<SFTPv3DirectoryEntry> list = client.ls( path );  // obtain the list of entries
+                List<SFTPv3DirectoryEntry> list = client.ls( path );  // obtain the list of entries
                 if( list != null ) {
                     int num = list.size(), cnt = 0;
                     int mode = adapter.getSortMode();
