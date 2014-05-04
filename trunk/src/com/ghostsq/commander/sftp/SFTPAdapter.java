@@ -143,7 +143,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             return conn.getConnectionInfo();   // is there any better way to know if it was connected already? 
         } catch( Throwable e ) {
             try {
-                return conn.connect( verifier, 10000, 10000 );
+                return conn.connect( verifier, 100000, 100000 ); // how long wait is too long?
             } catch( IOException e1 ) {
                 Log.e( TAG, "", e1 );
             }

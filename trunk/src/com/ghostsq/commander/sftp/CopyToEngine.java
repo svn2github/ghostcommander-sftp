@@ -131,7 +131,7 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
                         counter += copyFiles( f.listFiles(), sftp_fn );
                         if( !noErrors() ) break;
                     } else if( f.isFile() ) {
-                        SFTPv3FileHandle new_sftp_file = sftp.createFile( sftp_fn, null ); // TODO: set correct attributes
+                        SFTPv3FileHandle new_sftp_file = sftp.createFile( sftp_fn ); // TODO: set correct attributes
                         FileInputStream in = new FileInputStream( f );
                         byte buf[] = new byte[BLOCK_SIZE];
                         long done = 0, nn = 0;
