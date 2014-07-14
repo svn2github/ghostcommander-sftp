@@ -540,6 +540,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     @Override
     public void prepareToDestroy() {
         super.prepareToDestroy();
+        disconnect();
         items = null;
         uri = null;
         Log.d( TAG, "Destroying instance #" + instance_count-- );
