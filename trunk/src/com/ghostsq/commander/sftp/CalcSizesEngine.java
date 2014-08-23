@@ -21,6 +21,7 @@ class CalcSizesEngine extends SFTPEngineBase {
     @Override
     public void run() {
         try {
+            sendProgress();
             String path = Utils.mbAddSl( adapter.getUri().getPath() );
             long sum = getSizes( Utils.mbAddSl( path ), mList );
             StringBuffer result = new StringBuffer();
