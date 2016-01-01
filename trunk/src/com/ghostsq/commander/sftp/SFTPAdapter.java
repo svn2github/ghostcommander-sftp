@@ -143,7 +143,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             return conn.getConnectionInfo();   // is there any better way to know if it was connected already? 
         } catch( Throwable e ) {
             try {
-                return conn.connect( verifier, 100000, 100000 ); // how long wait is too long?
+                return conn.connect( verifier, 20000, 20000 ); // how long wait is too long?
             } catch( IOException e1 ) {
                 Log.e( TAG, "", e1 );
             }
@@ -187,7 +187,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                         Log.d( TAG, "authenticateWithPublicKey" );
                         auth_ok = conn.authenticateWithPublicKey( crd.getUserName(), key_file, crd.getPassword() );
                     } catch( IOException e ) {
-                        Log.w( TAG, "Keyfile " + key_file.getAbsolutePath() + " auth failed" );
+                        Log.w( TAG, "Keyfile " + key_file.getAbsolutePath() + " auth failed. Reason: " + e.toString() );
                         disconnect();
                         return NO_LOGIN;
                     }

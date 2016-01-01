@@ -78,6 +78,7 @@ class CopyFromEngine extends SFTPEngineBase
                 }
             }
             double conv = PERC / (double)dir_size;
+            Log.d( TAG, path + " size: " + dir_size );
             for( int i = 0; i < list.length; i++ ) {
                 if( stop || isInterrupted() ) {
                     error( ctx.getString( Utils.RR.interrupted.r() ) );

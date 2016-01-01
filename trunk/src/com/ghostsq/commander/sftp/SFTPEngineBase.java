@@ -37,6 +37,7 @@ class SFTPEngineBase extends Engine {
     
     protected final LsItem[] getItems( String full_fn ) {
         try {
+            if( sftp == null ) return null;
             List<SFTPv3DirectoryEntry> dir_entries = sftp.ls( full_fn );
             if( dir_entries != null ) {
                 int num_entries = dir_entries.size();
