@@ -17,6 +17,7 @@ import android.util.SparseBooleanArray;
 
 import ch.ethz.ssh2.Connection;
 import ch.ethz.ssh2.ConnectionInfo;
+import ch.ethz.ssh2.ConnectionMonitor;
 import ch.ethz.ssh2.InteractiveCallback;
 import ch.ethz.ssh2.SFTPv3Client;
 import ch.ethz.ssh2.SFTPv3DirectoryEntry;
@@ -30,6 +31,7 @@ import com.ghostsq.commander.adapters.CommanderAdapterBase;
 import com.ghostsq.commander.adapters.Engines;
 import com.ghostsq.commander.adapters.Engines.IReciever;
 import com.ghostsq.commander.adapters.FSAdapter;
+import com.ghostsq.commander.adapters.ItemComparator;
 import com.ghostsq.commander.favorites.Favorite;
 import com.ghostsq.commander.utils.Credentials;
 import com.ghostsq.commander.utils.LsItem;
@@ -40,7 +42,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     private SFTPConnection conn;
     private Credentials    crd;
     private Uri            uri;
-    private LsItem[]       items = null;
+    private Item[]         items = null;
     
     private static int   instance_count = 0;
 
@@ -142,8 +144,14 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         try {
             return conn.getConnectionInfo();   // is there any better way to know if it was connected already? 
         } catch( Throwable e ) {
+            Log.d( TAG, "Bad connection, trying to reconnect" );
             try {
-                return conn.connect( verifier, 20000, 20000 ); // how long wait is too long?
+                conn.close();
+            } catch( Exception e2 ) {
+                Log.d( TAG, "tryed to close a bad connection", e2 );
+            }
+            try {
+                return conn.connect( verifier, 60000, 60000 ); // how long wait is too long?
             } catch( IOException e1 ) {
                 Log.e( TAG, "", e1 );
             }
@@ -154,16 +162,30 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     
     public final int connectAndLogin( ServerHostKeyVerifier verifier ) throws IOException, InterruptedException {
         try {
+            Log.v( TAG, "connectAndLogin() is called " );
             Uri u = uri; 
             int port = u.getPort();
             if( port == -1 ) port = 22;
             
             String host = u.getHost();
             if( conn == null || !host.equalsIgnoreCase( conn.getHostname() ) ) {
+                Log.v( TAG, "creating a new connection" );
                 conn = new SFTPConnection( host, port );
+                ConnectionMonitor cmon = new ConnectionMonitor() {
+                    @Override
+                    public void connectionLost(Throwable cause) {
+                        Log.w( TAG, "connection lost " + cause.getMessage() );
+                        SFTPAdapter.this.disconnect();
+                    }
+                };
+                conn.addConnectionMonitor( cmon );                
             }
-            if( mbConnect( verifier ) == null ) 
+            ConnectionInfo ci = mbConnect( verifier );
+            if( ci == null ) { 
+                Log.d( TAG, "can't connect" );
                 return NO_CONNECT;
+            }
+            //Log.d( TAG, "connected " + ci.serverHostKey.toString() );
             if( conn.isAuthenticationComplete() ) {
                 return WAS_IN;
             }
@@ -270,14 +292,11 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     @Override
     protected void reSort() {
         if( items == null || items.length == 0 ) return;
-        LsItem item = items[0];
-        com.ghostsq.commander.utils.LsItem.LsItemPropComparator cmpr;
-        
-        cmpr = item.new LsItemPropComparator( 
+        Item item = items[0];
+        ItemComparator cmpr = new ItemComparator( 
                      mode & CommanderAdapter.MODE_SORTING, 
                     (mode & CommanderAdapter.MODE_CASE) != 0, 
                     (mode & CommanderAdapter.MODE_SORT_DIR) == 0 );
-
         Arrays.sort( items, cmpr );
     }
     
@@ -301,20 +320,20 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         }
         if( items == null || position < 0 || position > items.length )
             return;
-        LsItem item = items[position - 1];
+        Item item = items[position - 1];
         
-        if( item.isDirectory() ) {
+        if( item.dir ) {
             String cur = uri.getPath();
             if( cur == null || cur.length() == 0 ) 
                 cur = SLS;
             else
                 if( cur.charAt( cur.length()-1 ) != SLC )
                     cur += SLS;
-            Uri item_uri = uri.buildUpon().appendEncodedPath( item.getName() ).build();
+            Uri item_uri = uri.buildUpon().appendEncodedPath( item.name ).build();
             commander.Navigate( item_uri, null, null );
         }
         else {
-            Uri auth_item_uri = getUri().buildUpon().appendEncodedPath( item.getName() ).build();
+            Uri auth_item_uri = getUri().buildUpon().appendEncodedPath( item.name ).build();
             commander.Open( auth_item_uri, crd );
         }
     }
@@ -334,10 +353,10 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 if( path != null && path.length() > 0 ) {
                     if( path.charAt( path.length() - 1 ) != SLC )
                         path += SLS;
-                    return path + items[position-1].getName();
+                    return path + items[position-1].name;
                 }
             }
-            return items[position-1].getName();
+            return items[position-1].name;
         }
         return null;
     }
@@ -353,7 +372,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         notify( Commander.OPERATION_STARTED );
         String path = Utils.mbAddSl( uri.getPath() );
         commander.startEngine( new RenEngine( commander.getContext(), this,
-                 path + items[position - 1].getName(), path + newName ) );
+                 path + items[position - 1].name, path + newName ) );
         return true;
     }
 
@@ -361,7 +380,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     public boolean copyItems( SparseBooleanArray cis, CommanderAdapter to, boolean move ) {
         String err_msg = null;
         try {
-            LsItem[] subItems = bitsToItems( cis );
+            Item[] subItems = bitsToItems( cis );
             if( subItems == null ) {
                 notify( s( Utils.RR.copy_err.r() ), Commander.OPERATION_FAILED );
                 return false;
@@ -425,7 +444,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     @Override
     public void reqItemsSize( SparseBooleanArray cis ) {
         try {
-            LsItem[] list = bitsToItems( cis );
+            Item[] list = bitsToItems( cis );
             notify( Commander.OPERATION_STARTED );
             commander.startEngine( new CalcSizesEngine( this, list ) );
         }
@@ -436,7 +455,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     @Override
     public boolean deleteItems( SparseBooleanArray cis ) {
         try {
-            LsItem[] subItems = bitsToItems( cis );
+            Item[] subItems = bitsToItems( cis );
             if( subItems != null ) {
                 notify( Commander.OPERATION_STARTED );
                 commander.startEngine( new DelEngine( this, subItems ) );
@@ -459,12 +478,14 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             }
             else {
                 if( items != null && position > 0 && position <= items.length ) {
-                    LsItem curItem;
+                    Item curItem;
                     curItem = items[position - 1];
-                    item.dir = curItem.isDirectory();
-                    item.name = item.dir ? SLS + curItem.getName() : curItem.getName();
-                    item.size = !item.dir || curItem.length() > 0 ? curItem.length() : -1;
-                    item.date = curItem.getDate();
+                    item.dir = curItem.dir;
+                    item.name = item.dir ? SLS + curItem.name : curItem.name;
+                    item.size = !item.dir || curItem.size > 0 ? curItem.size : -1;
+                    item.date = curItem.date;
+                    if( curItem.origin != null ) 
+                        item.name += LsItem.LINK_PTR + curItem.origin;
                 }
             }
         }
@@ -519,13 +540,13 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         return null;
     }
     
-    private final LsItem[] bitsToItems( SparseBooleanArray cis ) {
+    private final Item[] bitsToItems( SparseBooleanArray cis ) {
         try {
             int counter = 0;
             for( int i = 0; i < cis.size(); i++ )
                 if( cis.valueAt( i ) )
                     counter++;
-            LsItem[] subItems = new LsItem[counter];
+            Item[] subItems = new Item[counter];
             int j = 0;
             for( int i = 0; i < cis.size(); i++ )
                 if( cis.valueAt( i ) )
@@ -548,7 +569,10 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     
     public void disconnect() {
         Log.d( TAG, "Disconnecting..." );
-        if( conn != null ) conn.close();
+        try {
+            if( conn != null ) conn.close();
+        } catch( Exception e ) {
+        }
         conn = null;
     }
     

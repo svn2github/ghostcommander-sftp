@@ -3,18 +3,17 @@ package com.ghostsq.commander.sftp;
 import java.util.Date;
 import java.util.Locale;
 
-import android.os.Handler;
 import android.text.format.DateFormat;
 import android.text.format.Formatter;
 
 import com.ghostsq.commander.Commander;
-import com.ghostsq.commander.utils.LsItem;
+import com.ghostsq.commander.adapters.CommanderAdapter.Item;
 import com.ghostsq.commander.utils.Utils;
 
 class CalcSizesEngine extends SFTPEngineBase {
     private int num = 0, dirs = 0, depth = 0;
 
-    CalcSizesEngine( SFTPAdapter a, LsItem[] list ) {
+    CalcSizesEngine( SFTPAdapter a, Item[] list ) {
         super( a, list );
     }
 
@@ -26,14 +25,14 @@ class CalcSizesEngine extends SFTPEngineBase {
             long sum = getSizes( Utils.mbAddSl( path ), mList );
             StringBuffer result = new StringBuffer();
             if( mList.length == 1 ) {
-                LsItem f = mList[0];
-                if( f.isDirectory() ) {
-                    result.append( ctx.getString( Utils.RR.sz_folder.r(), f.getName(), num ) );
+                Item f = mList[0];
+                if( f.dir ) {
+                    result.append( ctx.getString( Utils.RR.sz_folder.r(), f.name, num ) );
                     if( dirs > 0 )
                         result.append( ctx.getString( Utils.RR.sz_dirnum.r(), dirs, ( dirs > 1 ? ctx.getString( Utils.RR.sz_dirsfx_p.r() ) : ctx.getString( Utils.RR.sz_dirsfx_s.r() ) ) ) );
                 }
                 else
-                    result.append( ctx.getString( Utils.RR.sz_file.r(), f.getName() ) );
+                    result.append( ctx.getString( Utils.RR.sz_file.r(), f.name ) );
             } else
                 result.append( ctx.getString( Utils.RR.sz_files.r(), num ) );
             if( sum > 0 )
@@ -41,7 +40,7 @@ class CalcSizesEngine extends SFTPEngineBase {
             if( sum > 1024 )
                 result.append( ctx.getString( Utils.RR.sz_bytes.r(), sum ) );
             if( mList.length == 1 ) {
-                Date item_date = mList[0].getDate();
+                Date item_date = mList[0].date;
                 if( item_date != null ) {
                     result.append( ctx.getString( Utils.RR.sz_lastmod.r() ) );
                     result.append( " " );
@@ -64,19 +63,19 @@ class CalcSizesEngine extends SFTPEngineBase {
         }
     }
 
-    protected final long getSizes( String path, LsItem[] list ) throws Exception {
+    protected final long getSizes( String path, Item[] list ) throws Exception {
         long count = 0;
         for( int i = 0; i < list.length; i++ ) {
             if( isStopReq() ) return -1;
-            LsItem f = list[i];
+            Item f = list[i];
             if( skip( f ) ) continue;
-            String full_fn = path + f.getName();
-            if( f.isDirectory() ) {
-                sendProgress( f.getName(), (int)(i * 100. / list.length) );
+            String full_fn = path + f.name;
+            if( f.dir ) {
+                sendProgress( f.name, (int)(i * 100. / list.length) );
                 dirs++;
                 if( depth++ > 20 )
                     throw new Exception( ctx.getString( Utils.RR.too_deep_hierarchy.r() ) );
-                LsItem[] subItems = getItems( full_fn );
+                Item[] subItems = getItems( full_fn );
                 if( subItems != null && subItems.length > 0 ) {
                     long sz = getSizes( Utils.mbAddSl( full_fn ), subItems );
                     if( sz < 0 ) return -1;
@@ -86,7 +85,7 @@ class CalcSizesEngine extends SFTPEngineBase {
             }
             else {
                 num++;
-                count += f.length();
+                count += f.size;
             }
         }
         return count;

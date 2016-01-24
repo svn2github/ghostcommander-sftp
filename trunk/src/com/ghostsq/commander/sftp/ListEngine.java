@@ -3,8 +3,10 @@ package com.ghostsq.commander.sftp;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Vector;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 
 import android.content.Context;
 import android.net.Uri;
@@ -13,11 +15,14 @@ import android.util.Log;
 
 import ch.ethz.ssh2.SFTPv3Client;
 import ch.ethz.ssh2.SFTPv3DirectoryEntry;
+import ch.ethz.ssh2.SFTPv3FileAttributes;
 import ch.ethz.ssh2.ServerHostKeyVerifier;
 
 import com.ghostsq.commander.Commander;
 import com.ghostsq.commander.adapters.CommanderAdapter;
+import com.ghostsq.commander.adapters.CommanderAdapter.Item;
 import com.ghostsq.commander.adapters.Engine;
+import com.ghostsq.commander.adapters.ItemComparator;
 import com.ghostsq.commander.utils.Credentials;
 import com.ghostsq.commander.utils.LsItem;
 import com.ghostsq.commander.utils.Utils;
@@ -25,7 +30,7 @@ import com.ghostsq.commander.utils.Utils;
 class ListEngine extends Engine implements ServerHostKeyVerifier {
     private Context ctx;
     private SFTPAdapter  adapter;
-    private LsItem[]     items_tmp = null;
+    private Item[]       items_tmp = null;
     private String       pass_back_on_done, real_host, crypt;
     
     
@@ -35,7 +40,7 @@ class ListEngine extends Engine implements ServerHostKeyVerifier {
         adapter = a;
         pass_back_on_done = pass_back_on_done_;
     }
-    public LsItem[] getItems() {
+    public Item[] getItems() {
         return items_tmp;
     }       
     @Override
@@ -47,6 +52,7 @@ class ListEngine extends Engine implements ServerHostKeyVerifier {
             
             Credentials crd = adapter.getCredentials();
             int cl_res = adapter.connectAndLogin( this );
+            Log.d( TAG, "connectAndLogin() returned " + cl_res );
             if( cl_res < 0 ) {
                 if( cl_res == SFTPAdapter.NO_LOGIN ) 
                     sendLoginReq( adapter.toString(), crd, pass_back_on_done );
@@ -73,20 +79,31 @@ class ListEngine extends Engine implements ServerHostKeyVerifier {
                         if( toShow( list.get(i), hide ) ) cnt++;
                     
                     items_tmp = null;
-                    items_tmp = LsItem.createArray( cnt );
+                    items_tmp = new Item[cnt];
                     if( cnt > 0 ) {
                         cnt = 0;
                         for( int i = 0; i < num; i++ ) {
                             SFTPv3DirectoryEntry e = list.get(i);
                             if( toShow( e, hide ) ) {
-                                items_tmp[cnt++] = new LsItem( e.longEntry );
+                                Item item = new Item( e.getFilename() );
+                                items_tmp[cnt++] = item; 
+                                SFTPv3FileAttributes fa = e.getAttributes();
+                                //Log.v( TAG, e.longEntry + " " + fa.toString() );
+                                item.dir  = fa.isDirectory();
+                                if( !item.dir )
+                                    item.size = fa.size;
+                                item.date = new Date( (long)fa.mtime * 1000L );
+                                if( fa.isSymlink() ) {
+                                    String fpath = Utils.mbAddSl( path ) + item.name;
+                                    SFTPv3FileAttributes lfa = client.stat(  fpath );
+                                    if( lfa.isDirectory() ) item.dir = true;
+                                    item.origin = client.readLink( fpath );
+                                }
                                 //Log.v( TAG, e.longEntry );
                             }
                         }
-                        LsItem item = items_tmp[0];
-                        com.ghostsq.commander.utils.LsItem.LsItemPropComparator cmpr;
-                        
-                        cmpr = item.new LsItemPropComparator( 
+                        Item item = items_tmp[0];
+                        ItemComparator cmpr = new ItemComparator( 
                                      mode & CommanderAdapter.MODE_SORTING, 
                                     (mode & CommanderAdapter.MODE_CASE) != 0, 
                                     (mode & CommanderAdapter.MODE_SORT_DIR) == 0 );
@@ -130,6 +147,7 @@ class ListEngine extends Engine implements ServerHostKeyVerifier {
     {
         real_host = hostname;
         crypt = serverHostKeyAlgorithm;
+        Log.d( TAG, "Host key:" + Utils.toHexString( serverHostKey, ":" ) );
         return true; // the user is responsible where he does connect to, ok?
     }
 }

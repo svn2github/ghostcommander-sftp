@@ -15,10 +15,10 @@ import ch.ethz.ssh2.SFTPException;
 import ch.ethz.ssh2.SFTPv3FileHandle;
 
 import com.ghostsq.commander.Commander;
+import com.ghostsq.commander.adapters.CommanderAdapter.Item;
 import com.ghostsq.commander.adapters.CommanderAdapterBase;
 import com.ghostsq.commander.adapters.Engines;
 import com.ghostsq.commander.utils.ForwardCompat;
-import com.ghostsq.commander.utils.LsItem;
 import com.ghostsq.commander.utils.Utils;
 
 class CopyFromEngine extends SFTPEngineBase 
@@ -30,7 +30,7 @@ class CopyFromEngine extends SFTPEngineBase
     private   boolean       move;
     protected WifiLock      wifiLock;
 
-    CopyFromEngine( Commander c, SFTPAdapter a, LsItem[] list, File dest, boolean move_, Engines.IReciever recipient_ ) {
+    CopyFromEngine( Commander c, SFTPAdapter a, Item[] list, File dest, boolean move_, Engines.IReciever recipient_ ) {
         super( a, list );
         commander = c;
         src_path = Utils.mbAddSl( adapter.getUri().getPath() );
@@ -66,15 +66,15 @@ class CopyFromEngine extends SFTPEngineBase
         }
     }
     
-    private final int copyFiles( LsItem[] list, String path ) throws InterruptedException {
+    private final int copyFiles( Item[] list, String path ) throws InterruptedException {
         int counter = 0;
         try {
             long   dir_size = 0, byte_count = 0;
             for( int i = 0; i < list.length; i++ ) {
-                LsItem f = list[i];
+                Item f = list[i];
                 synchronized( f ) {
-                    if( !f.isDirectory() )
-                        dir_size += f.length();
+                    if( !f.dir )
+                        dir_size += f.size;
                 }
             }
             double conv = PERC / (double)dir_size;
@@ -84,22 +84,22 @@ class CopyFromEngine extends SFTPEngineBase
                     error( ctx.getString( Utils.RR.interrupted.r() ) );
                     break;
                 }
-                LsItem f = list[i];
+                Item f = list[i];
                 if( f != null ) {
-                    String fn = f.getName();
+                    String fn = f.name;
                     if( skip( f ) ) continue;
                     
                     String rel_path_name = path + fn;
                     String sftp_path_name = src_path + rel_path_name; 
                     File dest_file = new File( dest_folder, rel_path_name );
-                    if( f.isDirectory() ) {
+                    if( f.dir ) {
                         if( !dest_file.mkdir() ) {
                             if( !dest_file.exists() || !dest_file.isDirectory() ) {
                                 errMsg = "Can't create folder \"" + dest_file.getCanonicalPath() + "\"";
                                 break;
                             }
                         }
-                        LsItem[] subItems = getItems( sftp_path_name );
+                        Item[] subItems = getItems( sftp_path_name );
                         if( subItems != null & subItems.length > 0 )
                             counter += copyFiles( subItems, rel_path_name + CommanderAdapterBase.SLS );
                         if( !noErrors() ) break;
@@ -135,7 +135,7 @@ class CopyFromEngine extends SFTPEngineBase
                             int pnl = sftp_path_name.length();
                             String retr_s = ctx.getString( Utils.RR.retrieving.r(), 
                                     pnl > CUT_LEN ? "\u2026" + sftp_path_name.substring( pnl - CUT_LEN ) : sftp_path_name );
-                            String   sz_s = Utils.getHumanSize( f.length() );
+                            String   sz_s = Utils.getHumanSize( f.size );
                             int speed = 0;
                             long start_time = 0;
                             while( true ) {
@@ -182,7 +182,7 @@ class CopyFromEngine extends SFTPEngineBase
                             break;
                         }
                     }
-                    Date ftp_file_date = f.getDate();
+                    Date ftp_file_date = f.date;
                     if( ftp_file_date != null )
                         dest_file.setLastModified( ftp_file_date.getTime() );
                     

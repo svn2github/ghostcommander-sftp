@@ -1,13 +1,13 @@
 package com.ghostsq.commander.sftp;
 
 import com.ghostsq.commander.Commander;
-import com.ghostsq.commander.utils.LsItem;
+import com.ghostsq.commander.adapters.CommanderAdapter.Item;
 import com.ghostsq.commander.utils.Utils;
 
 class DelEngine extends SFTPEngineBase {
     private int so_far = 0;
     
-    public DelEngine( SFTPAdapter a, LsItem[] list ) {
+    public DelEngine( SFTPAdapter a, Item[] list ) {
         super( a, list );
     }
     @Override
@@ -24,7 +24,7 @@ class DelEngine extends SFTPEngineBase {
             finalize();
         }
     }
-    private final int deleteFiles( String path, LsItem[] l ) throws Exception {
+    private final int deleteFiles( String path, Item[] l ) throws Exception {
         if( l == null ) return 0;
         int cnt = 0;
         int num = l.length;
@@ -32,12 +32,12 @@ class DelEngine extends SFTPEngineBase {
         for( int i = 0; i < num; i++ ) {
             if( stop || isInterrupted() )
                 throw new Exception( ctx.getString( Utils.RR.interrupted.r() ) );
-            LsItem f = l[i];
+            Item f = l[i];
             if( skip( f ) ) continue;
-            sendProgress( ctx.getString( Utils.RR.deleting.r(), f.getName() ), so_far, (int)(i * conv) );
-            String full_fn = path + f.getName();
-            if( f.isDirectory() ) {
-                LsItem[] subItems = getItems( full_fn );
+            sendProgress( ctx.getString( Utils.RR.deleting.r(), f.name ), so_far, (int)(i * conv) );
+            String full_fn = path + f.name;
+            if( f.dir ) {
+                Item[] subItems = getItems( full_fn );
                 if( subItems == null ) break;
                 if( subItems.length > 0 )
                     cnt += deleteFiles( Utils.mbAddSl( full_fn ), subItems );
