@@ -93,13 +93,17 @@ class ListEngine extends Engine implements ServerHostKeyVerifier {
                                 if( !item.dir )
                                     item.size = fa.size;
                                 item.date = new Date( (long)fa.mtime * 1000L );
-                                if( fa.isSymlink() ) {
+                                LsItem lsi = new LsItem( e.longEntry );
+                                item.attr = lsi.getAttr();
+                                if( fa.isSymlink() ) try {
                                     String fpath = Utils.mbAddSl( path ) + item.name;
                                     SFTPv3FileAttributes lfa = client.stat(  fpath );
                                     if( lfa.isDirectory() ) item.dir = true;
                                     item.origin = client.readLink( fpath );
+                                } catch( Exception ex ) {
+                                    Log.e( TAG, "SFTP link is invalid: " + e.getFilename() + " " + 
+                                            ex.getLocalizedMessage() );
                                 }
-                                //Log.v( TAG, e.longEntry );
                             }
                         }
                         Item item = items_tmp[0];

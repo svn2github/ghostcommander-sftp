@@ -174,7 +174,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 ConnectionMonitor cmon = new ConnectionMonitor() {
                     @Override
                     public void connectionLost(Throwable cause) {
-                        Log.w( TAG, "connection lost " + cause.getMessage() );
+                        Log.w( TAG, "connection lost: " + cause.getMessage() );
                         SFTPAdapter.this.disconnect();
                     }
                 };
@@ -468,6 +468,10 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         return false;
     }
 
+    protected int getPredictedAttributesLength() {
+        return 25;
+    }
+    
     @Override
     public Object getItem( int position ) {
         Item item = new Item();
@@ -480,10 +484,15 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 if( items != null && position > 0 && position <= items.length ) {
                     Item curItem;
                     curItem = items[position - 1];
+                    if( curItem == null ) {
+                        Log.e( TAG, "Item is null: " + (position - 1) );
+                        return null;
+                    }
                     item.dir = curItem.dir;
                     item.name = item.dir ? SLS + curItem.name : curItem.name;
                     item.size = !item.dir || curItem.size > 0 ? curItem.size : -1;
                     item.date = curItem.date;
+                    item.attr = curItem.attr;
                     if( curItem.origin != null ) 
                         item.name += LsItem.LINK_PTR + curItem.origin;
                 }
@@ -590,11 +599,11 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     public InputStream getContent( Uri u, long skip ) {
         try {
             Log.v( TAG, "getContent() was called, " + ++content_requests_counter );
-            
-            if( uri != null && !uri.getHost().equals( u.getHost() ) )
-                return null;
-            uri = u;
             String sftp_path_name = u.getPath();
+            if( uri == null ) {
+                File f = new File( sftp_path_name );
+                uri = u.buildUpon().path( f.getParent() ).build();
+            }
             if( Utils.str( sftp_path_name ) && connectAndLogin( null ) > 0 ) {
                 SFTPv3Client client = getClient();
                 if( client == null ) return null;
@@ -613,10 +622,11 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     @Override
     public OutputStream saveContent( Uri u ) {
         try {
-            if( uri != null && !uri.getHost().equals( u.getHost() ) )
-                return null;
-            uri = u;
             String sftp_path_name = u.getPath();
+            if( uri == null ) {
+                File f = new File( sftp_path_name );
+                uri = u.buildUpon().path( f.getParent() ).build();
+            }
             if( Utils.str( sftp_path_name ) && connectAndLogin( null ) > NEUTRAL ) {
                 SFTPv3Client client = getClient();
                 if( client == null ) return null;
