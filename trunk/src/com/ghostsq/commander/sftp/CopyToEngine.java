@@ -104,88 +104,85 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
                     break;
                 }
                 File f = list[i];
-                if( f != null && f.exists() ) {
-                    boolean dir = f.isDirectory(); 
-                    String fn = f.getName();
-                    if( dir ) fn += "/";
-                    boolean create_dir = dir; 
-                    
-                    String sftp_fn = Utils.mbAddSl( dest )  + fn;
-                    try {
-                        SFTPv3FileAttributes sftp_file_attr = sftp.stat( sftp_fn );
-                        if( true ) {    // TODO: what of the attributes to consider?
-                            int res = askOnFileExist( ctx.getString( Utils.RR.file_exist.r(), sftp_fn ), commander );
-                            if( res == Commander.ABORT ) break;
-                            if( res == Commander.SKIP )  continue;
-                            if( res == Commander.REPLACE ) 
-                                if( dir ) 
-                                    create_dir = false;
-                                else
-                                    sftp.rm( sftp_fn );
-                        }
-                    } catch( Exception e1 ) {
-                    }
-                    if( dir ) {
-                        if( create_dir )
-                            sftp.mkdir( sftp_fn, 0777 );
-                        counter += copyFiles( f.listFiles(), sftp_fn );
-                        if( !noErrors() ) break;
-                    } else if( f.isFile() ) {
-                        SFTPv3FileHandle new_sftp_file = sftp.createFile( sftp_fn ); // TODO: set correct attributes
-                        FileInputStream in = new FileInputStream( f );
-                        byte buf[] = new byte[BLOCK_SIZE];
-                        long done = 0, nn = 0;
-                        int  n = 0;
-                        int  so_far = (int)(byte_count * conv);
-                        try {
-                            String path_name = f.getAbsolutePath();
-                            int pnl = path_name.length();
-                            String cur_op_s = ctx.getString( Utils.RR.uploading.r(), 
-                                    pnl > CUT_LEN ? "\u2026" + path_name.substring( pnl - CUT_LEN ) : path_name );
-                            String     sz_s = Utils.getHumanSize( f.length() );
-                            int speed = 0;
-                            long start_time = 0;
-                            while( true ) {
-                                if( isStopReq() ) {
-                                    error( ctx.getString( Utils.RR.fail_del.r(), sftp_fn ) );
-                                    sftp.closeFile( new_sftp_file );
-                                    sftp.rm( sftp_fn );
-                                    return counter;
-                                }
-                                if( nn == 0 ) {
-                                    start_time = System.currentTimeMillis();
-                                    sendProgress( cur_op_s + sizeOfsize( done, sz_s ), so_far, (int)(byte_count * conv), speed );
-                                }
-                                n = in.read( buf );
-                                if( n < 0 ) break;
-                                sftp.write( new_sftp_file, done, buf, 0, n );
-                                byte_count += n;
-                                done       += n;
-                                nn         += n;
-                                long time_delta = System.currentTimeMillis() - start_time;
-                                if( time_delta > DELAY ) {
-                                    speed = (int)(MILLI * nn / time_delta);
-                                    nn = 0;
-                                }
-                            }
-                            sendProgress( cur_op_s + sizeOfsize( done, sz_s ), so_far, (int)(byte_count * conv), speed );
-                            in.close();
-                            sftp.closeFile( new_sftp_file );
-                        } catch( Exception e ) {
-                            Log.e( TAG, "file: " + sftp_fn, e );
-                            in.close();
-                            sftp.closeFile( new_sftp_file );
-                            error( ctx.getString( Utils.RR.fail_del.r(), sftp_fn ) );
+                if( f == null || !f.exists() ) continue;
+                boolean dir = f.isDirectory(); 
+                String fn = f.getName();
+                if( dir ) fn += "/";
+                String sftp_fn = Utils.mbAddSl( dest )  + fn;
+                boolean sftp_exists = false;
+                try {
+                    SFTPv3FileAttributes sftp_file_attr = sftp.stat( sftp_fn );
+                    sftp_exists = true;
+                    if( !dir ) {
+                        int res = askOnFileExist( ctx.getString( Utils.RR.file_exist.r(), sftp_fn ), commander );
+                        if( res == Commander.ABORT ) break;
+                        if( res == Commander.SKIP )  continue;
+                        if( res == Commander.REPLACE ) 
                             sftp.rm( sftp_fn );
-                            break;
-                        }
                     }
-                    //new_file.setLastModified( f.lastModified() ); // TODO
-                    counter++;
-                    if( move && !f.delete() ) {
-                        error( ctx.getString( Utils.RR.cant_del.r(), f.getCanonicalPath() ) );
+                } catch( Exception e1 ) {
+                    sftp_exists = false;
+                }
+                if( dir ) {
+                    if( !sftp_exists )
+                        sftp.mkdir( sftp_fn, 0777 );
+                    counter += copyFiles( f.listFiles(), sftp_fn );
+                    if( !noErrors() ) break;
+                } else if( f.isFile() ) {
+                    SFTPv3FileHandle new_sftp_file = sftp.createFile( sftp_fn ); // TODO: set correct attributes
+                    FileInputStream in = new FileInputStream( f );
+                    byte buf[] = new byte[BLOCK_SIZE];
+                    long done = 0, nn = 0;
+                    int  n = 0;
+                    int  so_far = (int)(byte_count * conv);
+                    try {
+                        String path_name = f.getAbsolutePath();
+                        int pnl = path_name.length();
+                        String cur_op_s = ctx.getString( Utils.RR.uploading.r(), 
+                                pnl > CUT_LEN ? "\u2026" + path_name.substring( pnl - CUT_LEN ) : path_name );
+                        String     sz_s = Utils.getHumanSize( f.length() );
+                        int speed = 0;
+                        long start_time = 0;
+                        while( true ) {
+                            if( isStopReq() ) {
+                                error( ctx.getString( Utils.RR.fail_del.r(), sftp_fn ) );
+                                sftp.closeFile( new_sftp_file );
+                                sftp.rm( sftp_fn );
+                                return counter;
+                            }
+                            if( nn == 0 ) {
+                                start_time = System.currentTimeMillis();
+                                sendProgress( cur_op_s + sizeOfsize( done, sz_s ), so_far, (int)(byte_count * conv), speed );
+                            }
+                            n = in.read( buf );
+                            if( n < 0 ) break;
+                            sftp.write( new_sftp_file, done, buf, 0, n );
+                            byte_count += n;
+                            done       += n;
+                            nn         += n;
+                            long time_delta = System.currentTimeMillis() - start_time;
+                            if( time_delta > DELAY ) {
+                                speed = (int)(MILLI * nn / time_delta);
+                                nn = 0;
+                            }
+                        }
+                        sendProgress( cur_op_s + sizeOfsize( done, sz_s ), so_far, (int)(byte_count * conv), speed );
+                        in.close();
+                        sftp.closeFile( new_sftp_file );
+                    } catch( Exception e ) {
+                        Log.e( TAG, "file: " + sftp_fn, e );
+                        in.close();
+                        sftp.closeFile( new_sftp_file );
+                        error( ctx.getString( Utils.RR.fail_del.r(), sftp_fn ) );
+                        sftp.rm( sftp_fn );
                         break;
                     }
+                }
+                //new_file.setLastModified( f.lastModified() ); // TODO
+                counter++;
+                if( move && !f.delete() ) {
+                    error( ctx.getString( Utils.RR.cant_del.r(), f.getCanonicalPath() ) );
+                    break;
                 }
             }
         }
