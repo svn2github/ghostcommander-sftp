@@ -54,13 +54,13 @@ class ListEngine extends Engine implements ServerHostKeyVerifier {
             int cl_res = adapter.connectAndLogin( this );
             Log.d( TAG, "connectAndLogin() returned " + cl_res );
             if( cl_res < 0 ) {
-                if( cl_res == SFTPAdapter.NO_LOGIN ) 
+                if( cl_res == SFTPConnection.NO_LOGIN ) 
                     sendLoginReq( adapter.toString(), crd, pass_back_on_done );
                 else
                     sendProgress( null, Commander.OPERATION_FAILED, pass_back_on_done );
                 return;
             }
-            if( cl_res == SFTPAdapter.LOGGED_IN )
+            if( cl_res == SFTPConnection.LOGGED_IN )
                 sendProgress( ctx.getString( Utils.RR.ftp_connected.r(),  
                         real_host + " (" + crypt + ")", crd.getUserName() ), Commander.OPERATION_STARTED );
 
@@ -82,8 +82,9 @@ class ListEngine extends Engine implements ServerHostKeyVerifier {
                     items_tmp = new Item[cnt];
                     if( cnt > 0 ) {
                         cnt = 0;
+                        
                         for( int i = 0; i < num; i++ ) {
-                            SFTPv3DirectoryEntry e = list.get(i);
+                            Entry e = new Entry( list.get(i) );
                             if( toShow( e, hide ) ) {
                                 Item item = new Item( e.getFilename() );
                                 items_tmp[cnt++] = item; 

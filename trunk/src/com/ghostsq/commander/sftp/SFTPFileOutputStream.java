@@ -3,12 +3,12 @@ package com.ghostsq.commander.sftp;
 import java.io.IOException;
 import java.io.OutputStream;
 
-import ch.ethz.ssh2.SFTPClient;
+//import ch.ethz.ssh2.SFTPClient;
 import ch.ethz.ssh2.SFTPv3Client;
 import ch.ethz.ssh2.SFTPv3FileHandle;
 
 public class SFTPFileOutputStream extends OutputStream {
-    SFTPClient       sftp;
+    SFTPv3Client       sftp;
     SFTPv3FileHandle sftp_file;
     long pos = 0;
     

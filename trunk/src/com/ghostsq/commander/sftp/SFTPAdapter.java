@@ -40,36 +40,22 @@ import com.ghostsq.commander.utils.Utils;
 public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCallback, Engines.IReciever {
     private final static String TAG = "SFTPAdapter";
     private SFTPConnection conn;
-    private Credentials    crd;
-    private Uri            uri;
-    private Item[]         items = null;
-    
-    private static int   instance_count = 0;
+    private Credentials crd;
+    private Uri uri;
+    private Item[] items = null;
+    private static int instance_count = 0;
 
-    private class SFTPConnection extends Connection {
-        public SFTPConnection(String hostname, int port) {
-            super( hostname, port );
-        }
-        public SFTPConnection(String hostname) {
-            super( hostname );
-        }
-        @Override
-        public void finalize() {
-            Log.d( TAG, "SFTPConnection finalizing..." );
-            close();
-        }
-    }
-    
-    public SFTPAdapter( Context ctx_ ) {
+
+    public SFTPAdapter(Context ctx_) {
         super( ctx_ );
     }
-    
+
     @Override
     public void Init( Commander c ) {
         super.Init( c );
         Log.d( TAG, "Created instance #" + ++instance_count );
     }
-    
+
     @Override
     public String toString() {
         if( uri == null )
@@ -79,25 +65,28 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             return Utils.mbAddSl( Favorite.screenPwd( uri ) );
         if( crd == null )
             return Utils.mbAddSl( uri.toString() );
-        return Utils.mbAddSl( Favorite.screenPwd( Utils.getUriWithAuth( uri, crd ) ) );    
+        return Utils.mbAddSl( Favorite.screenPwd( Utils.getUriWithAuth( uri, crd ) ) );
     }
-    
+
     @Override
     public void setCredentials( Credentials crd_ ) {
         crd = crd_;
     }
+
     @Override
     public Credentials getCredentials() {
         return crd;
     }
-    
+
     @Override
     public void setUri( Uri uri_ ) {
-        if( uri_ == null ) return;
+        if( uri_ == null )
+            return;
         String ui = uri_.getUserInfo();
         if( ui != null )
             crd = new Credentials( ui );
-        uri = Utils.updateUserInfo( uri_, null );   // store the uri without credentials!        
+        uri = Utils.updateUserInfo( uri_, null ); // store the uri without
+                                                  // credentials!
     }
 
     @Override
@@ -115,7 +104,8 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         switch( feature ) {
         case REAL:
             return true;
-        default: return super.hasFeature( feature );
+        default:
+            return super.hasFeature( feature );
         }
     }
 
@@ -129,81 +119,47 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             client.setCharset( "UTF-8" );
             return client;
         } catch( IOException e ) {
-            Log.e( TAG,  "", e );
+            Log.e( TAG, "", e );
         }
         return null;
     }
-    
-    public final static int WAS_IN      =  1;
-    public final static int LOGGED_IN   =  2;
-    public final static int NEUTRAL     =  0;
-    public final static int NO_CONNECT  = -1;
-    public final static int NO_LOGIN    = -2;
 
-    private final ConnectionInfo mbConnect( ServerHostKeyVerifier verifier ) {
-        try {
-            return conn.getConnectionInfo();   // is there any better way to know if it was connected already? 
-        } catch( Throwable e ) {
-            Log.d( TAG, "Bad connection, trying to reconnect" );
-            try {
-                conn.close();
-            } catch( Exception e2 ) {
-                Log.d( TAG, "tryed to close a bad connection", e2 );
-            }
-            try {
-                return conn.connect( verifier, 60000, 60000 ); // how long wait is too long?
-            } catch( IOException e1 ) {
-                Log.e( TAG, "", e1 );
-            }
-        }
-        disconnect();
-        return null;
-    }
-    
     public final int connectAndLogin( ServerHostKeyVerifier verifier ) throws IOException, InterruptedException {
         try {
-            Log.v( TAG, "connectAndLogin() is called " );
-            Uri u = uri; 
+            Log.v( TAG, "connectAndLogin() is called in thread " + Thread.currentThread().getId() );
+            Uri u = uri;
             int port = u.getPort();
-            if( port == -1 ) port = 22;
-            
+            if( port == -1 )
+                port = 22;
+
             String host = u.getHost();
             if( conn == null || !host.equalsIgnoreCase( conn.getHostname() ) ) {
                 Log.v( TAG, "creating a new connection" );
                 conn = new SFTPConnection( host, port );
-                ConnectionMonitor cmon = new ConnectionMonitor() {
-                    @Override
-                    public void connectionLost(Throwable cause) {
-                        Log.w( TAG, "connection lost: " + cause.getMessage() );
-                        SFTPAdapter.this.disconnect();
-                    }
-                };
-                conn.addConnectionMonitor( cmon );                
             }
-            ConnectionInfo ci = mbConnect( verifier );
-            if( ci == null ) { 
+            ConnectionInfo ci = conn.mbConnect( verifier );
+            if( ci == null ) {
                 Log.d( TAG, "can't connect" );
-                return NO_CONNECT;
+                return SFTPConnection.NO_CONNECT;
             }
-            //Log.d( TAG, "connected " + ci.serverHostKey.toString() );
+            // Log.d( TAG, "connected " + ci.serverHostKey.toString() );
             if( conn.isAuthenticationComplete() ) {
-                return WAS_IN;
+                return SFTPConnection.WAS_IN;
             }
-            
+
             if( crd == null ) {
                 String ui = u.getUserInfo();
                 if( ui == null ) {
                     conn.close();
                     Log.w( TAG, "No credentials provided" );
-                    return NO_LOGIN;
+                    return SFTPConnection.NO_LOGIN;
                 }
                 crd = new Credentials( ui );
             }
-            
+
             boolean auth_ok = false;
             if( conn.isAuthMethodAvailable( crd.getUserName(), "publickey" ) ) {
-                File key_file = new File( Environment.getExternalStorageDirectory(), 
-                        ".GhostCommander/keys/" + uri.getHost() );
+                File key_file = new File( Environment.getExternalStorageDirectory(), ".GhostCommander/keys/" + uri.getHost() );
                 if( key_file.exists() )
                     try {
                         Log.d( TAG, "authenticateWithPublicKey" );
@@ -211,7 +167,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                     } catch( IOException e ) {
                         Log.w( TAG, "Keyfile " + key_file.getAbsolutePath() + " auth failed. Reason: " + e.toString() );
                         disconnect();
-                        return NO_LOGIN;
+                        return SFTPConnection.NO_LOGIN;
                     }
             }
             if( !auth_ok && conn.isAuthMethodAvailable( crd.getUserName(), "password" ) )
@@ -221,9 +177,9 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 } catch( IOException e ) {
                     Log.w( TAG, "" );
                     disconnect();
-                    return NO_LOGIN;
+                    return SFTPConnection.NO_LOGIN;
                 }
-            if( !auth_ok && conn.isAuthMethodAvailable( crd.getUserName(), "keyboard-interactive") )
+            if( !auth_ok && conn.isAuthMethodAvailable( crd.getUserName(), "keyboard-interactive" ) )
                 try {
                     Log.d( TAG, "authenticateWithKeyboardInteractive" );
                     auth_ok = conn.authenticateWithKeyboardInteractive( crd.getUserName(), this );
@@ -231,19 +187,18 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                     Log.e( TAG, "", e );
                     disconnect();
                 }
-                
             if( auth_ok ) {
-                return LOGGED_IN;
+                return SFTPConnection.LOGGED_IN;
             } else {
                 disconnect();
                 Log.w( TAG, "Invalid credentials." );
-                return NO_LOGIN;
+                return SFTPConnection.NO_LOGIN;
             }
         } catch( Exception e ) {
             Log.e( TAG, uri.toString(), e );
             disconnect();
         }
-        return NO_CONNECT;
+        return SFTPConnection.NO_CONNECT;
     }
 
     /**
@@ -263,9 +218,10 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             response[i] = crd.getPassword();
         return response;
     }
-    
+
     @Override
     public boolean readSource( Uri tmp_uri, String pass_back_on_done ) {
+        Log.v( TAG, "readSource() is called in thread " + Thread.currentThread().getId() );
         if( tmp_uri != null )
             setUri( tmp_uri );
         if( uri == null )
@@ -291,28 +247,28 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
 
     @Override
     protected void reSort() {
-        if( items == null || items.length == 0 ) return;
+        if( items == null || items.length == 0 )
+            return;
         Item item = items[0];
-        ItemComparator cmpr = new ItemComparator( 
-                     mode & CommanderAdapter.MODE_SORTING, 
-                    (mode & CommanderAdapter.MODE_CASE) != 0, 
-                    (mode & CommanderAdapter.MODE_SORT_DIR) == 0 );
+        ItemComparator cmpr = new ItemComparator( mode & CommanderAdapter.MODE_SORTING, ( mode & CommanderAdapter.MODE_CASE ) != 0,
+                ( mode & CommanderAdapter.MODE_SORT_DIR ) == 0 );
         Arrays.sort( items, cmpr );
     }
-    
+
     @Override
     public void openItem( int position ) {
         if( position == 0 ) { // ..
             if( uri != null && parentLink != SLS ) {
                 String path = uri.getPath();
-                int len_ = path.length()-1;
+                int len_ = path.length() - 1;
                 if( len_ > 0 ) {
                     if( path.charAt( len_ ) == SLC )
                         path = path.substring( 0, len_ );
                     path = path.substring( 0, path.lastIndexOf( SLC ) );
                     if( path.length() == 0 )
                         path = SLS;
-                    // passing null instead of credentials keeps the current authentication session
+                    // passing null instead of credentials keeps the current
+                    // authentication session
                     commander.Navigate( uri.buildUpon().path( path ).build(), null, uri.getLastPathSegment() );
                 }
             }
@@ -321,18 +277,16 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         if( items == null || position < 0 || position > items.length )
             return;
         Item item = items[position - 1];
-        
+
         if( item.dir ) {
             String cur = uri.getPath();
-            if( cur == null || cur.length() == 0 ) 
+            if( cur == null || cur.length() == 0 )
                 cur = SLS;
-            else
-                if( cur.charAt( cur.length()-1 ) != SLC )
-                    cur += SLS;
+            else if( cur.charAt( cur.length() - 1 ) != SLC )
+                cur += SLS;
             Uri item_uri = uri.buildUpon().appendEncodedPath( item.name ).build();
             commander.Navigate( item_uri, null, null );
-        }
-        else {
+        } else {
             Uri auth_item_uri = getUri().buildUpon().appendEncodedPath( item.name ).build();
             commander.Open( auth_item_uri, crd );
         }
@@ -341,10 +295,11 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     @Override
     public Uri getItemUri( int position ) {
         Uri u = getUri();
-        if( u == null ) return null;
+        if( u == null )
+            return null;
         return u.buildUpon().appendEncodedPath( getItemName( position, false ) ).build();
     }
-    
+
     @Override
     public String getItemName( int position, boolean full ) {
         if( items != null && position > 0 && position <= items.length ) {
@@ -353,10 +308,10 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 if( path != null && path.length() > 0 ) {
                     if( path.charAt( path.length() - 1 ) != SLC )
                         path += SLS;
-                    return path + items[position-1].name;
+                    return path + items[position - 1].name;
                 }
             }
-            return items[position-1].name;
+            return items[position - 1].name;
         }
         return null;
     }
@@ -371,8 +326,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         }
         notify( Commander.OPERATION_STARTED );
         String path = Utils.mbAddSl( uri.getPath() );
-        commander.startEngine( new RenEngine( commander.getContext(), this,
-                 path + items[position - 1].name, path + newName ) );
+        commander.startEngine( new RenEngine( commander.getContext(), this, path + items[position - 1].name, path + newName ) );
         return true;
     }
 
@@ -384,13 +338,14 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             if( subItems == null ) {
                 notify( s( Utils.RR.copy_err.r() ), Commander.OPERATION_FAILED );
                 return false;
-            } 
+            }
             File dest = null;
             Engines.IReciever recipient = null;
-            if( to instanceof FSAdapter  ) {
+            if( to instanceof FSAdapter ) {
                 String dest_fn = to.toString();
                 dest = new File( dest_fn );
-                if( !dest.exists() ) dest.mkdirs();
+                if( !dest.exists() )
+                    dest.mkdirs();
                 if( !dest.isDirectory() )
                     throw new RuntimeException( ctx.getString( Utils.RR.file_exist.r(), dest_fn ) );
             } else {
@@ -401,8 +356,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             CopyFromEngine cfe = new CopyFromEngine( commander, this, subItems, dest, move, recipient );
             commander.startEngine( cfe );
             return true;
-        }
-        catch( Exception e ) {
+        } catch( Exception e ) {
             err_msg = "Exception: " + e.getMessage();
         }
         notify( err_msg, Commander.OPERATION_FAILED );
@@ -447,11 +401,10 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             Item[] list = bitsToItems( cis );
             notify( Commander.OPERATION_STARTED );
             commander.startEngine( new CalcSizesEngine( this, list ) );
-        }
-        catch(Exception e) {
+        } catch( Exception e ) {
         }
     }
-    
+
     @Override
     public boolean deleteItems( SparseBooleanArray cis ) {
         try {
@@ -461,8 +414,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 commander.startEngine( new DelEngine( this, subItems ) );
                 return true;
             }
-        }
-        catch( Exception e ) {
+        } catch( Exception e ) {
             commander.showError( "Exception: " + e.getMessage() );
         }
         return false;
@@ -471,7 +423,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     protected int getPredictedAttributesLength() {
         return 25;
     }
-    
+
     @Override
     public Object getItem( int position ) {
         Item item = new Item();
@@ -479,13 +431,12 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         {
             if( position == 0 ) {
                 item.name = parentLink;
-            }
-            else {
+            } else {
                 if( items != null && position > 0 && position <= items.length ) {
                     Item curItem;
                     curItem = items[position - 1];
                     if( curItem == null ) {
-                        Log.e( TAG, "Item is null: " + (position - 1) );
+                        Log.e( TAG, "Item is null: " + ( position - 1 ) );
                         return null;
                     }
                     item.dir = curItem.dir;
@@ -493,14 +444,14 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                     item.size = !item.dir || curItem.size > 0 ? curItem.size : -1;
                     item.date = curItem.date;
                     item.attr = curItem.attr;
-                    if( curItem.origin != null ) 
+                    if( curItem.origin != null )
                         item.name += LsItem.LINK_PTR + curItem.origin;
                 }
             }
         }
         return item;
     }
-    
+
     @Override
     public Item getItem( Uri u ) {
         try {
@@ -510,23 +461,26 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 item.dir = true;
                 return item;
             }
-            String prt_path = ""; 
-            for( int i = 0; i < segs.size()-1; i++ ) {
+            String prt_path = "";
+            for( int i = 0; i < segs.size() - 1; i++ ) {
                 prt_path += "/" + segs.get( i );
             }
             String fn = segs.get( segs.size() - 1 );
-            if( fn == null ) return null;
+            if( fn == null )
+                return null;
             uri = u;
             if( connectAndLogin( null ) > 0 ) {
                 SFTPv3Client client = getClient();
-                if( client == null ) return null;
+                if( client == null )
+                    return null;
                 try {
                     List dir_entries = client.ls( prt_path );
                     if( dir_entries != null ) {
                         int num_entries = dir_entries.size();
                         for( int i = 0; i < num_entries; i++ ) {
-                            SFTPv3DirectoryEntry entry = (SFTPv3DirectoryEntry)dir_entries.get(i);
-                            if( !fn.equals( entry.filename ) ) continue;
+                            SFTPv3DirectoryEntry entry = (SFTPv3DirectoryEntry)dir_entries.get( i );
+                            if( !fn.equals( entry.filename ) )
+                                continue;
                             LsItem ls_item = new LsItem( entry.longEntry );
                             String ifn = ls_item.getName();
                             Item item = new Item( ifn );
@@ -538,8 +492,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                     }
                 } catch( Throwable e ) {
                     Log.e( TAG, u.toString(), e );
-                }
-                finally {
+                } finally {
                     client.close();
                 }
             }
@@ -548,7 +501,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         }
         return null;
     }
-    
+
     private final Item[] bitsToItems( SparseBooleanArray cis ) {
         try {
             int counter = 0;
@@ -559,7 +512,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             int j = 0;
             for( int i = 0; i < cis.size(); i++ )
                 if( cis.valueAt( i ) )
-                    subItems[j++] = items[ cis.keyAt( i ) - 1 ];
+                    subItems[j++] = items[cis.keyAt( i ) - 1];
             return subItems;
         } catch( Exception e ) {
             Log.e( TAG, "", e );
@@ -570,31 +523,38 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     @Override
     public void prepareToDestroy() {
         super.prepareToDestroy();
-        disconnect();
+        new Thread( new Runnable() {
+            @Override
+            public void run() {
+                SFTPAdapter.this.disconnect();
+            }
+        } ).start();
         items = null;
         uri = null;
         Log.d( TAG, "Destroying instance #" + instance_count-- );
     }
-    
+
     public void disconnect() {
+        Log.v( TAG, "disconnect() is called in thread " + Thread.currentThread().getId() );
         Log.d( TAG, "Disconnecting..." );
         try {
-            if( conn != null ) conn.close();
+            if( conn != null )
+                conn.close();
         } catch( Exception e ) {
         }
         conn = null;
     }
-    
+
     @Override
     public void finalize() {
         Log.d( TAG, "Finalizing..." );
         disconnect();
     }
-    
-// ----------------------------------------
+
+    // ----------------------------------------
 
     private int content_requests_counter = 0;
-    
+
     @Override
     public InputStream getContent( Uri u, long skip ) {
         try {
@@ -606,19 +566,21 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             }
             if( Utils.str( sftp_path_name ) && connectAndLogin( null ) > 0 ) {
                 SFTPv3Client client = getClient();
-                if( client == null ) return null;
+                if( client == null )
+                    return null;
                 SFTPv3FileHandle sftp_file = client.openFileRO( sftp_path_name );
                 if( sftp_file != null )
                     return new SFTPFileInputStream( sftp_file, skip );
                 else
                     Log.e( TAG, "Can't opent the requested file. " + u );
-            }
-            else Log.e( TAG, "Can't connect. Reqested URI: " + u );
+            } else
+                Log.e( TAG, "Can't connect. Reqested URI: " + u );
         } catch( Exception e ) {
             Log.e( TAG, "Exception on request of the file " + u, e );
         }
         return null;
     }
+
     @Override
     public OutputStream saveContent( Uri u ) {
         try {
@@ -627,9 +589,10 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 File f = new File( sftp_path_name );
                 uri = u.buildUpon().path( f.getParent() ).build();
             }
-            if( Utils.str( sftp_path_name ) && connectAndLogin( null ) > NEUTRAL ) {
+            if( Utils.str( sftp_path_name ) && connectAndLogin( null ) > SFTPConnection.NEUTRAL ) {
                 SFTPv3Client client = getClient();
-                if( client == null ) return null;
+                if( client == null )
+                    return null;
                 SFTPv3FileHandle sftp_file = client.createFileTruncate( sftp_path_name );
                 if( sftp_file != null )
                     return new SFTPFileOutputStream( sftp_file );
@@ -639,6 +602,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         }
         return null;
     }
+
     @Override
     public void closeStream( Closeable s ) {
         try {
@@ -646,7 +610,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             if( s != null )
                 s.close();
         } catch( IOException e ) {
-            Log.e( TAG, "closeStream()" + (uri != null ? uri.toString() : ""), e );
+            Log.e( TAG, "closeStream()" + ( uri != null ? uri.toString() : "" ), e );
         }
     }
 

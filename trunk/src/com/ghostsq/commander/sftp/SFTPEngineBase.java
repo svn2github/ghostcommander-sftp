@@ -46,7 +46,8 @@ class SFTPEngineBase extends Engine {
                 Item[] subItems = new Item[num_entries];
                 if( num_entries > 0 )
                     for( int j = 0; j < num_entries; j++ ) {
-                        SFTPv3DirectoryEntry e = dir_entries.get(j);
+                        Entry e = new Entry( dir_entries.get(j) );
+                        //SFTPv3DirectoryEntry e = dir_entries.get(j);
                         Item item = new Item( e.getFilename() );
                         subItems[j] = item; 
                         SFTPv3FileAttributes fa = e.getAttributes();
