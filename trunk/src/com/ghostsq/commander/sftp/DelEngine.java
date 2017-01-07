@@ -13,6 +13,9 @@ class DelEngine extends SFTPEngineBase {
     @Override
     public void run() {
         try {
+            if( sftp == null ) sftp = adapter.getClient();
+            if( sftp == null ) return;
+
             String path = Utils.mbAddSl( adapter.getUri().getPath() );
             int total;
             total = deleteFiles( Utils.mbAddSl( path ), mList );

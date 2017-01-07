@@ -24,7 +24,7 @@ class SFTPEngineBase extends Engine {
     protected SFTPEngineBase( SFTPAdapter a, Item[] list ) {
         adapter = a;
         ctx     = adapter.ctx;
-        sftp    = adapter.getClient();
+        //sftp    = adapter.getClient();
         mList   = list;
     }
 
@@ -39,6 +39,7 @@ class SFTPEngineBase extends Engine {
     
     protected final Item[] getItems( String full_fn ) {
         try {
+            if( sftp == null ) sftp = adapter.getClient();
             if( sftp == null ) return null;
             List<SFTPv3DirectoryEntry> dir_entries = sftp.ls( full_fn );
             if( dir_entries != null ) {

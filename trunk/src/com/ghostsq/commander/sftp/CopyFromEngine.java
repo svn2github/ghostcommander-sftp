@@ -46,6 +46,9 @@ class CopyFromEngine extends SFTPEngineBase
     @Override
     public void run() {
         try {
+            if( sftp == null ) sftp = adapter.getClient();
+            if( sftp == null ) return;
+            
             wifiLock.acquire();
             int total = copyFiles( mList, "" );
             

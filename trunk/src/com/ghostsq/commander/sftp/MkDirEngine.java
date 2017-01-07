@@ -13,6 +13,8 @@ class MkDirEngine extends SFTPEngineBase {
     @Override
     public void run() {
         try {
+            if( sftp == null ) sftp = adapter.getClient();
+            if( sftp == null ) return;
             sftp.mkdir( full_name, 0777 );
             sendProgress( null, Commander.OPERATION_COMPLETED_REFRESH_REQUIRED );
             return;
