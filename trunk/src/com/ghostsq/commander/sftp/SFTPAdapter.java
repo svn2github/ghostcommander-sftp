@@ -5,9 +5,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Vector;
 
 import android.content.Context;
 import android.net.Uri;
@@ -15,9 +16,7 @@ import android.os.Environment;
 import android.util.Log;
 import android.util.SparseBooleanArray;
 
-import ch.ethz.ssh2.Connection;
 import ch.ethz.ssh2.ConnectionInfo;
-import ch.ethz.ssh2.ConnectionMonitor;
 import ch.ethz.ssh2.InteractiveCallback;
 import ch.ethz.ssh2.SFTPv3Client;
 import ch.ethz.ssh2.SFTPv3DirectoryEntry;
@@ -44,7 +43,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     private Uri uri;
     private Item[] items = null;
     private static int instance_count = 0;
-
+    private String fingerprint;
 
     public SFTPAdapter(Context ctx_) {
         super( ctx_ );
@@ -66,6 +65,23 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         if( crd == null )
             return Utils.mbAddSl( uri.toString() );
         return Utils.mbAddSl( Favorite.screenPwd( Utils.getUriWithAuth( uri, crd ) ) );
+    }
+    
+    public final String getFingerPrint() {
+        return fingerprint == null ? "" : fingerprint;
+    }
+    
+    private final void setFingerprint( ConnectionInfo ci )
+    {
+        fingerprint = null;
+        if( ci == null ) return; 
+        try {
+            MessageDigest md = MessageDigest.getInstance( "MD5" );
+            md.update( ci.serverHostKey, 0, ci.serverHostKey.length );
+            fingerprint = ci.serverHostKeyAlgorithm + " " + Utils.toHexString( md.digest(), ":" );
+        } catch( NoSuchAlgorithmException e ) {
+            Log.e( TAG, "", e );
+        }
     }
 
     @Override
@@ -127,6 +143,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
     public final int connectAndLogin( ServerHostKeyVerifier verifier ) throws IOException, InterruptedException {
         try {
             Log.v( TAG, "connectAndLogin() is called in thread " + Thread.currentThread().getId() );
+            this.fingerprint = null;
             Uri u = uri;
             int port = u.getPort();
             if( port == -1 )
@@ -146,8 +163,10 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             if( conn.isAuthenticationComplete() ) {
                 return SFTPConnection.WAS_IN;
             }
-
+            File key_file = getPrivateKeyFile();
             if( crd == null ) {
+                if( !key_file.exists() )
+                    setFingerprint( ci );
                 String ui = u.getUserInfo();
                 if( ui == null ) {
                     conn.close();
@@ -159,7 +178,6 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
 
             boolean auth_ok = false;
             if( conn.isAuthMethodAvailable( crd.getUserName(), "publickey" ) ) {
-                File key_file = new File( Environment.getExternalStorageDirectory(), ".GhostCommander/keys/" + uri.getHost() );
                 if( key_file.exists() )
                     try {
                         Log.d( TAG, "authenticateWithPublicKey" );
@@ -175,7 +193,8 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                     Log.d( TAG, "authenticateWithPassword" );
                     auth_ok = conn.authenticateWithPassword( crd.getUserName(), crd.getPassword() );
                 } catch( IOException e ) {
-                    Log.w( TAG, "" );
+                    Log.w( TAG, "wrong password?" );
+                    setFingerprint( ci );
                     disconnect();
                     return SFTPConnection.NO_LOGIN;
                 }
@@ -190,6 +209,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             if( auth_ok ) {
                 return SFTPConnection.LOGGED_IN;
             } else {
+                setFingerprint( ci );
                 disconnect();
                 Log.w( TAG, "Invalid credentials." );
                 return SFTPConnection.NO_LOGIN;
@@ -201,6 +221,10 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         return SFTPConnection.NO_CONNECT;
     }
 
+    private final File getPrivateKeyFile() {
+        return new File( Environment.getExternalStorageDirectory(), ".GhostCommander/keys/" + uri.getHost() );
+    }
+    
     /**
      * InteractiveCallback implementation
      */

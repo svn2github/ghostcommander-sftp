@@ -54,9 +54,10 @@ class ListEngine extends Engine implements ServerHostKeyVerifier {
             int cl_res = adapter.connectAndLogin( this );
             Log.d( TAG, "connectAndLogin() returned " + cl_res );
             if( cl_res < 0 ) {
-                if( cl_res == SFTPConnection.NO_LOGIN ) 
-                    sendLoginReq( adapter.toString(), crd, pass_back_on_done );
-                else
+                if( cl_res == SFTPConnection.NO_LOGIN ) {
+                    String descr = adapter.toString() + "\n" + adapter.getFingerPrint();
+                    sendLoginReq( descr, crd, pass_back_on_done );
+                } else
                     sendProgress( null, Commander.OPERATION_FAILED, pass_back_on_done );
                 return;
             }
@@ -152,7 +153,6 @@ class ListEngine extends Engine implements ServerHostKeyVerifier {
     {
         real_host = hostname;
         crypt = serverHostKeyAlgorithm;
-        Log.d( TAG, "Host key:" + Utils.toHexString( serverHostKey, ":" ) );
-        return true; // the user is responsible where he does connect to, ok?
+        return true;
     }
 }

@@ -188,10 +188,7 @@ class CopyFromEngine extends SFTPEngineBase
                     Date ftp_file_date = f.date;
                     if( ftp_file_date != null )
                         dest_file.setLastModified( ftp_file_date.getTime() );
-                    
-                    final int GINGERBREAD = 9;
-                    if( android.os.Build.VERSION.SDK_INT >= GINGERBREAD )
-                        ForwardCompat.setFullPermissions( dest_file );
+                    Utils.setFullPermissions( dest_file );
                     counter++;
                 }
             }
