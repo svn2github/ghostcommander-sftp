@@ -349,8 +349,9 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
             return false;
         }
         notify( Commander.OPERATION_STARTED );
-        String path = Utils.mbAddSl( uri.getPath() );
-        commander.startEngine( new RenEngine( commander.getContext(), this, path + items[position - 1].name, path + newName ) );
+        Item[] list = new Item[1];
+        list[0] = items[position - 1]; 
+        commander.startEngine( new RenEngine( commander.getContext(), this, list, newName ) );
         return true;
     }
 
@@ -372,6 +373,10 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                     dest.mkdirs();
                 if( !dest.isDirectory() )
                     throw new RuntimeException( ctx.getString( Utils.RR.file_exist.r(), dest_fn ) );
+            } else if( move && to.getClass().getName().indexOf( "SFTPAdapter" ) >= 0 ) {
+                String new_path = Utils.mbAddSl( to.getUri().getPath() );
+                commander.startEngine( new RenEngine( commander.getContext(), this, subItems, new_path ) );
+                return true;                
             } else {
                 dest = new File( createTempDir() );
                 recipient = to.getReceiver();
