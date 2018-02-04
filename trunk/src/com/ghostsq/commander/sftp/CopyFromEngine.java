@@ -51,7 +51,6 @@ class CopyFromEngine extends SFTPEngineBase
             
             wifiLock.acquire();
             int total = copyFiles( mList, "" );
-            
             if( recipient != null ) {
                   sendReceiveReq( dest_folder );
                   return;
