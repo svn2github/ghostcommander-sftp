@@ -351,7 +351,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         notify( Commander.OPERATION_STARTED );
         Item[] list = new Item[1];
         list[0] = items[position - 1]; 
-        commander.startEngine( new RenEngine( commander.getContext(), this, list, newName ) );
+        commander.startEngine( new RenEngine( commander, this, list, newName ) );
         return true;
     }
 
@@ -374,10 +374,14 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 if( !dest.isDirectory() )
                     throw new RuntimeException( ctx.getString( Utils.RR.file_exist.r(), dest_fn ) );
             } else if( move && to.getClass().getName().indexOf( "SFTPAdapter" ) >= 0 ) {
-                String new_path = Utils.mbAddSl( to.getUri().getPath() );
-                commander.startEngine( new RenEngine( commander.getContext(), this, subItems, new_path ) );
-                return true;                
-            } else {
+                Uri dest_uri = to.getUri();
+                if( uri.getHost().equals( dest_uri.getHost() ) ) { 
+                    String new_path = Utils.mbAddSl( dest_uri.getPath() );
+                    commander.startEngine( new RenEngine( commander, this, subItems, new_path ) );
+                    return true;
+                }
+            } 
+            if( dest == null ) {
                 dest = new File( createTempDir() );
                 recipient = to.getReceiver();
             }
