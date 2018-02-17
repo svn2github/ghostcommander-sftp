@@ -46,13 +46,15 @@ class RenEngine extends SFTPEngineBase {
     }
 
     public boolean move( SFTPv3Client sftp, Item[] origList, String base_path, String new_name, boolean dest_is_dir ) {
-        try {
-            for( int i = 0; i < origList.length; i++ ) {
+        int ok_cnt = 0;
+        for( int i = 0; i < origList.length; i++ ) {
+            String old_path = null, new_path = null;
+            try {
                 String old_name = origList[i].name;
                 if( ".".equals( old_name ) || "..".equals( old_name ) )
                     continue;
-                String old_path = base_path + old_name;
-                String new_path = dest_is_dir ? new_name + old_name : base_path + new_name;
+                old_path = base_path + old_name;
+                new_path = dest_is_dir ? new_name + old_name : base_path + new_name;
                 if( old_path.equals( new_path ) )
                     continue;
                 try {
@@ -67,6 +69,7 @@ class RenEngine extends SFTPEngineBase {
                             Item[] sub_items = getItems( old_path );
                             if( move( sftp, sub_items, Utils.mbAddSl( old_path ), Utils.mbAddSl( new_path ), true ) ) {
                                 sftp.rmdir( old_path );
+                                ok_cnt++;
                                 continue;
                             }
                         } else
@@ -74,13 +77,13 @@ class RenEngine extends SFTPEngineBase {
                     }
                 } catch( Exception e1 ) {}
                 sftp.mv( old_path, new_path );
+                ok_cnt++;
+            } catch( Exception e ) {
+                Log.e( TAG, "Moving from " + old_path + " to " + new_path, e );
+                error( ctx.getString( Utils.RR.failed.r() ) + e.getLocalizedMessage() );
             }
-            return true;
-        } catch( Exception e ) {
-            Log.e( TAG, "Moving from " + base_path, e );
-            error( ctx.getString( Utils.RR.failed.r() ) + e.getLocalizedMessage() );
-            return false;
         }
+        return true;
     }
 
 }
