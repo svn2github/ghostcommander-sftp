@@ -308,7 +308,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
                 cur = SLS;
             else if( cur.charAt( cur.length() - 1 ) != SLC )
                 cur += SLS;
-            Uri item_uri = uri.buildUpon().appendEncodedPath( item.name ).build();
+            Uri item_uri = uri.buildUpon().appendPath( item.name ).build();
             commander.Navigate( item_uri, null, null );
         } else {
             Uri auth_item_uri = getUri().buildUpon().appendEncodedPath( item.name ).build();
@@ -321,7 +321,7 @@ public class SFTPAdapter extends CommanderAdapterBase implements InteractiveCall
         Uri u = getUri();
         if( u == null )
             return null;
-        return u.buildUpon().appendEncodedPath( getItemName( position, false ) ).build();
+        return u.buildUpon().appendPath( getItemName( position, false ) ).build();
     }
 
     @Override
