@@ -66,11 +66,6 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
                 dest_path = "/";
                  
             int cnt = copyFiles( mList, dest_path );
-            if( del_src_dir ) {
-                File src_dir = mList[0].getParentFile();
-                if( src_dir != null )
-                    src_dir.delete();
-            }
             sendResult( Utils.getOpReport( ctx, cnt, move ? Utils.RR.moved.r() : Utils.RR.copied.r() ) );
             super.run();
         } catch( IOException e ) {
@@ -83,6 +78,8 @@ class CopyToEngine extends Engine // From a local fs to SFTP share
         finally {
             if( sftp != null ) sftp.close();
             sftp = null;
+            if( del_src_dir )
+                deleteDir( mList[0].getParentFile() );
             wifiLock.release();
         }
     }
